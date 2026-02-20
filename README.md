@@ -1,14 +1,14 @@
 # gotion
 
-Notion API を操作するための CLI ツール。
+A CLI tool for interacting with the Notion API.
 
-## インストール
+## Installation
 
 ```bash
 go install github.com/longkey1/gotion@latest
 ```
 
-または、リポジトリをクローンしてビルド:
+Or clone and build:
 
 ```bash
 git clone https://github.com/longkey1/gotion.git
@@ -16,101 +16,149 @@ cd gotion
 go build -o gotion .
 ```
 
-## 認証
+## Configuration
 
-### 方法1: MCP OAuth (推奨)
+gotion supports two backends: **MCP** and **API**. Configure via environment variables or config file.
 
-事前の設定なしで認証できます。
+### Backend Selection
+
+Set `backend` to choose which Notion API to use:
 
 ```bash
-gotion auth --mcp
+# Environment variable
+export GOTION_BACKEND="mcp"  # or "api"
+
+# Or config file (~/.config/gotion/config.toml)
+backend = "mcp"
 ```
 
-ブラウザが開き、Notion アカウントで認証を行います。認証情報は `~/.config/gotion/token.json` に保存されます。
+| Backend | Description |
+|---------|-------------|
+| `mcp` | MCP API with Dynamic Client Registration (no setup required) |
+| `api` | Traditional REST API (requires client_id and client_secret) |
 
-### 方法2: 従来の OAuth
+## Authentication
 
-Notion Integration を作成して認証します。
+### MCP Backend (Recommended)
 
-1. [Notion Integrations](https://www.notion.so/my-integrations) で Public Integration を作成
-2. Redirect URI に `http://localhost:8080/callback` を設定
-3. Client ID と Client Secret を取得
-
-環境変数または設定ファイルで認証情報を設定:
+No pre-configuration required. Uses Dynamic Client Registration (RFC 7591).
 
 ```bash
-# 環境変数
+# Set backend to mcp
+export GOTION_BACKEND="mcp"
+
+# Run authentication
+gotion auth
+```
+
+A browser window will open for Notion authorization. Credentials are saved to `~/.config/gotion/token.json`.
+
+### API Backend
+
+Requires creating a Notion Integration.
+
+1. Create a Public Integration at [Notion Integrations](https://www.notion.so/my-integrations)
+2. Set Redirect URI to `http://localhost:8080/callback`
+3. Get Client ID and Client Secret
+
+Configure credentials:
+
+```bash
+# Environment variables
+export GOTION_BACKEND="api"
 export GOTION_CLIENT_ID="your-client-id"
 export GOTION_CLIENT_SECRET="your-client-secret"
 
-# または設定ファイル (~/.config/gotion/config.toml)
+# Or config file (~/.config/gotion/config.toml)
+backend = "api"
 client_id = "your-client-id"
 client_secret = "your-client-secret"
 ```
 
-認証を実行:
+Run authentication:
 
 ```bash
 gotion auth
 ```
 
-### 方法3: トークン直接指定
+### Direct Token
 
-Internal Integration のトークンを直接使用:
+Use an Internal Integration token directly (skips OAuth):
 
 ```bash
 export GOTION_TOKEN="secret_xxxxxxxx"
-# または
+# or
 export NOTION_TOKEN="secret_xxxxxxxx"
 ```
 
-## 使い方
+## Usage
 
-### ページの検索
+### Search Pages
 
 ```bash
-# キーワードで検索
-gotion list -q "検索キーワード"
+# Search with keyword
+gotion list -q "search keyword"
 
-# 件数を指定
-gotion list -q "検索キーワード" -n 20
+# Limit results
+gotion list -q "search keyword" -n 20
 
-# JSON 形式で出力
-gotion list -q "検索キーワード" -f json
-
-# テーブル形式で出力 (デフォルト)
-gotion list -q "検索キーワード" -f table
+# Output as JSON (API backend only)
+gotion list -q "search keyword" -f json
 ```
 
-### ページの取得
+### Get Page
 
 ```bash
-# ページ ID を指定して取得
+# Get page by ID or URL
 gotion get <page_id>
 
-# JSON 形式で出力
+# Output as JSON (API backend only)
 gotion get <page_id> -f json
 
-# 特定のプロパティのみ取得
+# Filter specific properties
 gotion get <page_id> --filter-properties "title,status"
 ```
 
-## コマンド一覧
+## Output Formats
 
-| コマンド | 説明 |
-|---------|------|
-| `auth` | Notion アカウントで認証 |
-| `list` | ページを検索・一覧表示 |
-| `get` | ページの詳細を取得 |
-| `version` | バージョン情報を表示 |
+| Backend | Default | JSON |
+|---------|---------|------|
+| MCP | Markdown | Not supported |
+| API | Markdown | `--format json` |
 
-## 設定ファイル
+Both backends output Markdown by default. The `--format json` option is only available with the API backend.
 
-認証情報は以下の場所に保存されます:
+## Commands
 
-- トークン: `~/.config/gotion/token.json`
-- 設定: `~/.config/gotion/config.toml`
+| Command | Description |
+|---------|-------------|
+| `auth` | Authenticate with Notion |
+| `config` | Show current configuration |
+| `list` | Search and list pages |
+| `get` | Get page details |
+| `version` | Show version info |
 
-## ライセンス
+## Environment Variables
+
+All config file settings can be overridden with environment variables:
+
+| Environment Variable | Config Key | Description |
+|---------------------|------------|-------------|
+| `GOTION_BACKEND` | `backend` | API backend (`api` or `mcp`) |
+| `GOTION_CLIENT_ID` | `client_id` | OAuth client ID |
+| `GOTION_CLIENT_SECRET` | `client_secret` | OAuth client secret |
+| `GOTION_TOKEN` | - | Direct API token |
+| `NOTION_TOKEN` | - | Direct API token (fallback) |
+
+Priority: Environment variables > Config file > Token file
+
+## Files
+
+| File | Description |
+|------|-------------|
+| `~/.config/gotion/config.toml` | Configuration settings |
+| `~/.config/gotion/token.json` | OAuth tokens |
+
+## License
 
 MIT

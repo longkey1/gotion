@@ -52,6 +52,7 @@ type TokenData struct {
 }
 
 // Load loads configuration from environment variables and config file
+// Priority: environment variables > config file > token file
 func Load() (*Config, error) {
 	v := viper.New()
 
@@ -59,30 +60,13 @@ func Load() (*Config, error) {
 	v.SetEnvPrefix(EnvPrefix)
 	v.AutomaticEnv()
 
-	// Check GOTION_TOKEN first
-	if token := os.Getenv("GOTION_TOKEN"); token != "" {
-		return &Config{Token: token}, nil
-	}
+	// Bind environment variables explicitly for underscore keys
+	_ = v.BindEnv("backend", "GOTION_BACKEND")
+	_ = v.BindEnv("client_id", "GOTION_CLIENT_ID")
+	_ = v.BindEnv("client_secret", "GOTION_CLIENT_SECRET")
+	_ = v.BindEnv("token", "GOTION_TOKEN")
 
-	// Then check NOTION_TOKEN
-	if token := os.Getenv("NOTION_TOKEN"); token != "" {
-		return &Config{Token: token}, nil
-	}
-
-	// Try to load OAuth token from token file
-	tokenData, err := LoadToken()
-	if err == nil && tokenData.AccessToken != "" {
-		cfg := &Config{
-			Token:    tokenData.AccessToken,
-			Backend:  tokenData.Backend,
-			ClientID: tokenData.ClientID,
-		}
-		// Also load OAuth settings from config file for potential refresh
-		loadOAuthSettings(cfg)
-		return cfg, nil
-	}
-
-	// Try to load from config file
+	// Load config file
 	configDir, err := GetConfigDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get config directory: %w", err)
@@ -96,32 +80,48 @@ func Load() (*Config, error) {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
-		// Config file not found, return empty config
-		return &Config{}, nil
+		// Config file not found, continue with env vars only
 	}
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	// Also check NOTION_TOKEN as fallback for token
+	if cfg.Token == "" {
+		if token := os.Getenv("NOTION_TOKEN"); token != "" {
+			cfg.Token = token
+		}
+	}
+
+	// If still no token, try to load from token file
+	if cfg.Token == "" {
+		tokenData, err := LoadToken()
+		if err == nil && tokenData.AccessToken != "" {
+			cfg.Token = tokenData.AccessToken
+			if cfg.ClientID == "" {
+				cfg.ClientID = tokenData.ClientID
+			}
+		}
 	}
 
 	return &cfg, nil
 }
 
 // LoadOAuthConfig loads OAuth-specific configuration
+// Priority: environment variables > config file
 func LoadOAuthConfig() (*Config, error) {
 	v := viper.New()
 
-	// Check environment variables first
-	clientID := os.Getenv("GOTION_CLIENT_ID")
-	clientSecret := os.Getenv("GOTION_CLIENT_SECRET")
+	// Set up environment variable binding
+	v.SetEnvPrefix(EnvPrefix)
+	v.AutomaticEnv()
 
-	if clientID != "" && clientSecret != "" {
-		return &Config{
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
-		}, nil
-	}
+	// Bind environment variables explicitly for underscore keys
+	_ = v.BindEnv("backend", "GOTION_BACKEND")
+	_ = v.BindEnv("client_id", "GOTION_CLIENT_ID")
+	_ = v.BindEnv("client_secret", "GOTION_CLIENT_SECRET")
 
 	// Try to load from config file
 	configDir, err := GetConfigDir()
@@ -137,7 +137,7 @@ func LoadOAuthConfig() (*Config, error) {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
-		return &Config{}, nil
+		// Config file not found, continue with env vars only
 	}
 
 	var cfg Config
@@ -146,27 +146,6 @@ func LoadOAuthConfig() (*Config, error) {
 	}
 
 	return &cfg, nil
-}
-
-// loadOAuthSettings loads OAuth settings into config
-func loadOAuthSettings(cfg *Config) {
-	v := viper.New()
-
-	configDir, err := GetConfigDir()
-	if err != nil {
-		return
-	}
-
-	v.SetConfigName(ConfigFileName)
-	v.SetConfigType(ConfigFileType)
-	v.AddConfigPath(configDir)
-
-	if err := v.ReadInConfig(); err != nil {
-		return
-	}
-
-	cfg.ClientID = v.GetString("client_id")
-	cfg.ClientSecret = v.GetString("client_secret")
 }
 
 // GetConfigDir returns the configuration directory path

@@ -51,10 +51,12 @@ func (c *Client) GetPage(ctx context.Context, pageID string, opts *types.GetPage
 		return nil, err
 	}
 
-	content := extractTextContent(result)
+	title, url, content := extractPageContent(result)
 
 	return &types.PageResult{
 		ID:      pageID,
+		Title:   title,
+		URL:     url,
 		Content: content,
 		Source:  "mcp",
 	}, nil
@@ -267,16 +269,34 @@ type toolContent struct {
 	Text string `json:"text,omitempty"`
 }
 
+// mcpTextResponse represents the JSON structure in the text field
+type mcpTextResponse struct {
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Title    string                 `json:"title,omitempty"`
+	URL      string                 `json:"url,omitempty"`
+	Text     string                 `json:"text,omitempty"`
+}
+
 // FormatPage formats a page result
 func (c *Client) FormatPage(result *types.PageResult, format types.OutputFormat) (string, error) {
 	switch format {
 	case types.FormatJSON:
 		return "", fmt.Errorf("--format=json is not supported with MCP backend")
 	case types.FormatMarkdown, "":
-		return result.Content, nil
+		return formatWithFrontmatter(result.Title, result.URL, result.Content), nil
 	default:
 		return "", fmt.Errorf("unsupported format: %s", format)
 	}
+}
+
+func formatWithFrontmatter(title, url, content string) string {
+	var sb strings.Builder
+	sb.WriteString("---\n")
+	sb.WriteString(fmt.Sprintf("title: %q\n", title))
+	sb.WriteString(fmt.Sprintf("url: %s\n", url))
+	sb.WriteString("---\n\n")
+	sb.WriteString(content)
+	return sb.String()
 }
 
 // FormatSearch formats a search result
@@ -291,16 +311,25 @@ func (c *Client) FormatSearch(result *types.SearchResult, format types.OutputFor
 	}
 }
 
-func extractTextContent(result *toolResult) string {
+func extractPageContent(result *toolResult) (title, url, content string) {
 	if result == nil || len(result.Content) == 0 {
-		return ""
+		return "", "", ""
 	}
 
 	for _, c := range result.Content {
 		if c.Type == "text" {
-			return c.Text
+			var resp mcpTextResponse
+			if err := json.Unmarshal([]byte(c.Text), &resp); err == nil {
+				return resp.Title, resp.URL, resp.Text
+			}
+			return "", "", c.Text
 		}
 	}
 
-	return ""
+	return "", "", ""
+}
+
+func extractTextContent(result *toolResult) string {
+	_, _, content := extractPageContent(result)
+	return content
 }

@@ -25,7 +25,6 @@ const (
 
 type authOptions struct {
 	port int
-	mcp  bool
 }
 
 var authOpts = &authOptions{}
@@ -36,12 +35,13 @@ var authCmd = &cobra.Command{
 	Long: `Authenticate with Notion API using OAuth.
 This command initiates the OAuth flow to obtain and save access tokens.
 
-Before running this command, you need to configure your OAuth credentials:
-  - Set GOTION_CLIENT_ID and GOTION_CLIENT_SECRET environment variables
-  - Or add client_id and client_secret to ~/.config/gotion/config.toml
+The authentication method is determined by the 'backend' setting in config.toml:
+  - backend = "mcp": Uses MCP OAuth (Dynamic Client Registration, no setup required)
+  - backend = "api": Uses traditional OAuth (requires client_id and client_secret)
 
-Alternatively, use --mcp flag to authenticate via MCP OAuth (Dynamic Client Registration).
-This does not require pre-configured client credentials.`,
+For API backend, configure credentials:
+  - Set GOTION_CLIENT_ID and GOTION_CLIENT_SECRET environment variables
+  - Or add client_id and client_secret to ~/.config/gotion/config.toml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runAuth(cmd.Context(), authOpts)
 	},
@@ -49,11 +49,16 @@ This does not require pre-configured client credentials.`,
 
 func init() {
 	authCmd.Flags().IntVarP(&authOpts.port, "port", "p", defaultCallbackPort, "Local callback server port")
-	authCmd.Flags().BoolVar(&authOpts.mcp, "mcp", false, "Use MCP OAuth (Dynamic Client Registration)")
 	rootCmd.AddCommand(authCmd)
 }
 
 func runAuth(ctx context.Context, opts *authOptions) error {
+	// Load config to determine backend
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
 	// Check if token already exists
 	configDir, _ := config.GetConfigDir()
 	tokenPath := configDir + "/token.json"
@@ -68,17 +73,19 @@ func runAuth(ctx context.Context, opts *authOptions) error {
 		}
 	}
 
-	// Use MCP OAuth only if --mcp flag is specified
-	if opts.mcp {
+	// Choose auth method based on backend setting
+	switch cfg.Backend {
+	case config.BackendMCP:
 		return runMCPAuth(ctx, opts)
+	case config.BackendAPI, "":
+		oauthCfg, err := config.LoadOAuthConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load OAuth config: %w", err)
+		}
+		return runTraditionalAuth(ctx, opts, oauthCfg)
+	default:
+		return fmt.Errorf("unknown backend: %s", cfg.Backend)
 	}
-
-	// Traditional OAuth
-	cfg, err := config.LoadOAuthConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load OAuth config: %w", err)
-	}
-	return runTraditionalAuth(ctx, opts, cfg)
 }
 
 func runMCPAuth(ctx context.Context, opts *authOptions) error {
@@ -158,9 +165,8 @@ func runMCPAuth(ctx context.Context, opts *authOptions) error {
 		return fmt.Errorf("failed to exchange code: %w", err)
 	}
 
-	// Save token with client_id for future refresh
+	// Save token
 	tokenData := &config.TokenData{
-		Backend:      config.BackendMCP,
 		AccessToken:  token.AccessToken,
 		TokenType:    token.TokenType,
 		ClientID:     mcpClient.GetClientID(),
@@ -242,7 +248,6 @@ func runTraditionalAuth(ctx context.Context, opts *authOptions, cfg *config.Conf
 
 	// Save token
 	tokenData := &config.TokenData{
-		Backend:       config.BackendAPI,
 		AccessToken:   token.AccessToken,
 		TokenType:     token.TokenType,
 		BotID:         token.BotID,
