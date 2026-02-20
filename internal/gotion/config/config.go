@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -107,6 +108,20 @@ func Load() (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+// IsTokenExpired checks if the token is expired or about to expire (within 5 minutes)
+func (t *TokenData) IsTokenExpired() bool {
+	if t.ExpiresAt == 0 {
+		return false // No expiration info, assume valid
+	}
+	// Expired if within 5 minutes of expiration
+	return time.Now().Unix() > t.ExpiresAt-300
+}
+
+// NeedsRefresh checks if the token needs refresh
+func (t *TokenData) NeedsRefresh() bool {
+	return t.RefreshToken != "" && t.IsTokenExpired()
 }
 
 // LoadOAuthConfig loads OAuth-specific configuration

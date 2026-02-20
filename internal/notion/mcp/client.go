@@ -109,8 +109,8 @@ func (c *Client) ensureInitialized(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize MCP session: %w", err)
 	}
 
-	if resp.Error != nil {
-		return fmt.Errorf("MCP initialize error: %s", resp.Error.Message)
+	if errObj := resp.GetError(); errObj != nil {
+		return fmt.Errorf("MCP initialize error: %s", errObj.Message)
 	}
 
 	// Send initialized notification
@@ -134,8 +134,8 @@ func (c *Client) callTool(ctx context.Context, name string, args map[string]inte
 		return nil, fmt.Errorf("failed to call tool %s: %w", name, err)
 	}
 
-	if resp.Error != nil {
-		return nil, fmt.Errorf("MCP tool error: %s", resp.Error.Message)
+	if errObj := resp.GetError(); errObj != nil {
+		return nil, fmt.Errorf("MCP tool error: %s", errObj.Message)
 	}
 
 	var result toolResult
@@ -251,13 +251,35 @@ type jsonRPCRequest struct {
 type jsonRPCResponse struct {
 	JSONRPC string          `json:"jsonrpc"`
 	Result  json.RawMessage `json:"result,omitempty"`
-	Error   *jsonRPCError   `json:"error,omitempty"`
+	Error   json.RawMessage `json:"error,omitempty"`
 	ID      int64           `json:"id"`
 }
 
 type jsonRPCError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
+}
+
+// GetError parses the error field which can be either a string or an object
+func (r *jsonRPCResponse) GetError() *jsonRPCError {
+	if len(r.Error) == 0 {
+		return nil
+	}
+
+	// Try to unmarshal as object first
+	var errObj jsonRPCError
+	if err := json.Unmarshal(r.Error, &errObj); err == nil {
+		return &errObj
+	}
+
+	// Try to unmarshal as string
+	var errStr string
+	if err := json.Unmarshal(r.Error, &errStr); err == nil {
+		return &jsonRPCError{Message: errStr}
+	}
+
+	// Return raw error
+	return &jsonRPCError{Message: string(r.Error)}
 }
 
 type toolResult struct {

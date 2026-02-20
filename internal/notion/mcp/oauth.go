@@ -337,3 +337,58 @@ func (c *OAuthClient) GetClientID() string {
 func (c *OAuthClient) GetCallbackURL() string {
 	return c.callbackURL
 }
+
+// RefreshToken refreshes an access token using a refresh token
+func RefreshToken(ctx context.Context, clientID, refreshToken string) (*OAuthToken, error) {
+	client := &OAuthClient{
+		httpClient:   &http.Client{Timeout: 30 * time.Second},
+		mcpServerURL: serverURL,
+	}
+
+	// Discover endpoints
+	if err := client.DiscoverEndpoints(ctx); err != nil {
+		return nil, fmt.Errorf("failed to discover endpoints: %w", err)
+	}
+
+	data := url.Values{}
+	data.Set("grant_type", "refresh_token")
+	data.Set("refresh_token", refreshToken)
+	data.Set("client_id", clientID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, client.authServer.TokenEndpoint, strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create refresh request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := client.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to refresh token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to refresh token: HTTP %d: %s", resp.StatusCode, string(body))
+	}
+
+	var token OAuthToken
+	if err := json.Unmarshal(body, &token); err != nil {
+		return nil, fmt.Errorf("failed to decode token response: %w", err)
+	}
+
+	if token.AccessToken == "" {
+		return nil, fmt.Errorf("no access_token in refresh response")
+	}
+
+	// Calculate expires_at if expires_in is provided
+	if token.ExpiresIn > 0 {
+		token.ExpiresAt = time.Now().Unix() + int64(token.ExpiresIn)
+	}
+
+	return &token, nil
+}
