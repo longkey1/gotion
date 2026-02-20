@@ -1,73 +1,48 @@
-# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 version: 2
 
 before:
   hooks:
     - go mod tidy
-    - go mod download
 
 builds:
-  - id: gotion
-    main: .
-    binary: gotion
-    env:
+  - env:
       - CGO_ENABLED=0
     goos:
       - linux
       - darwin
-      - windows
     goarch:
       - amd64
       - arm64
+      - arm
+    goarm:
+      - "6"  # For Raspberry Pi 1, 2
+      - "7"  # For Raspberry Pi 3, 4, 5 (32-bit)
+    ignore:
+      - goos: darwin
+        goarch: 386
     ldflags:
       - -s -w
       - -X github.com/longkey1/gotion/internal/version.Version={{.Version}}
-      - -X github.com/longkey1/gotion/internal/version.Commit={{.Commit}}
-      - -X github.com/longkey1/gotion/internal/version.Date={{.Date}}
+      - -X github.com/longkey1/gotion/internal/version.CommitSHA={{.Commit}}
+      - -X github.com/longkey1/gotion/internal/version.BuildTime={{.Date}}
 
 archives:
-  - id: gotion
-    builds:
-      - gotion
-    formats:
-      - tar.gz
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-
-checksum:
-  name_template: "checksums.txt"
+  - name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "arm" }}armv{{ .Arm }}
+      {{- else }}{{ .Arch }}{{ end }}
+    files:
+      - none*
 
 changelog:
   sort: asc
   filters:
     exclude:
-      - "^docs:"
-      - "^test:"
-      - "^chore:"
-      - "^ci:"
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
       - Merge pull request
       - Merge branch
-
-release:
-  github:
-    owner: longkey1
-    name: gotion
-  draft: false
-  prerelease: auto
-  name_template: "{{.ProjectName}} v{{.Version}}"
-
-brews:
-  - repository:
-      owner: longkey1
-      name: homebrew-tap
-    directory: Formula
-    homepage: "https://github.com/longkey1/gotion"
-    description: "A CLI tool for Notion API"
-    license: "MIT"
-    test: |
-      system "#{bin}/gotion", "version"
-    install: |
-      bin.install "gotion"

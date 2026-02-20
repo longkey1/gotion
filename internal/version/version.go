@@ -1,35 +1,25 @@
 package version
 
 import (
-	"runtime/debug"
+	"fmt"
+	"runtime"
 )
 
+// These variables are set at build time using ldflags
 var (
-	// Version is set via ldflags at build time
-	Version = "dev"
-	// Commit is set via ldflags at build time
-	Commit = "none"
-	// Date is set via ldflags at build time
-	Date = "unknown"
+	Version   = "dev"
+	CommitSHA = "unknown"
+	BuildTime = "unknown"
+	GoVersion = runtime.Version()
 )
 
-// Get returns the version string
-func Get() string {
-	if Version != "dev" {
-		return Version
-	}
-
-	// Try to get version from build info
-	if info, ok := debug.ReadBuildInfo(); ok {
-		if info.Main.Version != "(devel)" && info.Main.Version != "" {
-			return info.Main.Version
-		}
-	}
-
-	return Version
+// Info returns version information as a string
+func Info() string {
+	return fmt.Sprintf("Version: %s\nCommit: %s\nBuild Time: %s\nGo Version: %s",
+		Version, CommitSHA, BuildTime, GoVersion)
 }
 
-// GetFull returns full version information
-func GetFull() string {
-	return "gotion version " + Get() + " (commit: " + Commit + ", built: " + Date + ")"
+// Short returns a short version string
+func Short() string {
+	return Version
 }
