@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/longkey1/gotion/internal/gotion"
 	"github.com/longkey1/gotion/internal/notion/types"
 )
 
@@ -171,13 +172,48 @@ func (c *Client) Search(ctx context.Context, query string, opts *types.SearchOpt
 	return result, nil
 }
 
+// ToPageOutput converts PageResult to the intermediate PageOutput structure
+func (c *Client) ToPageOutput(result *types.PageResult) *gotion.PageOutput {
+	// Build content from properties
+	var content strings.Builder
+	for name, value := range result.Props {
+		if name == "title" {
+			continue
+		}
+		content.WriteString(fmt.Sprintf("- **%s:** %s\n", name, value))
+	}
+
+	return &gotion.PageOutput{
+		Title:   result.Title,
+		URL:     result.URL,
+		Content: content.String(),
+	}
+}
+
+// ToSearchOutput converts SearchResult to the intermediate SearchOutput structure
+func (c *Client) ToSearchOutput(result *types.SearchResult) *gotion.SearchOutput {
+	pages := make([]gotion.SearchPageItem, len(result.Pages))
+	for i, p := range result.Pages {
+		pages[i] = gotion.SearchPageItem{
+			Title: p.Title,
+			URL:   p.URL,
+		}
+	}
+
+	return &gotion.SearchOutput{
+		Pages:      pages,
+		HasMore:    result.HasMore,
+		NextCursor: result.NextCursor,
+	}
+}
+
 // FormatPage formats a page result
 func (c *Client) FormatPage(result *types.PageResult, format types.OutputFormat) (string, error) {
 	switch format {
 	case types.FormatJSON:
 		return string(result.RawJSON), nil
 	case types.FormatMarkdown, "":
-		return formatPageAsMarkdown(result.Title, result.URL, result.Props), nil
+		return gotion.FormatPage(c.ToPageOutput(result)), nil
 	default:
 		return "", fmt.Errorf("unsupported format: %s", format)
 	}
@@ -189,7 +225,7 @@ func (c *Client) FormatSearch(result *types.SearchResult, format types.OutputFor
 	case types.FormatJSON:
 		return string(result.RawJSON), nil
 	case types.FormatMarkdown, "":
-		return formatSearchAsMarkdown(result.Pages, result.HasMore, result.NextCursor), nil
+		return gotion.FormatSearch(c.ToSearchOutput(result)), nil
 	default:
 		return "", fmt.Errorf("unsupported format: %s", format)
 	}
@@ -203,41 +239,6 @@ func (c *Client) setHeaders(req *http.Request) {
 
 func normalizeID(id string) string {
 	return strings.ReplaceAll(id, "-", "")
-}
-
-// formatPageAsMarkdown formats page data as markdown
-func formatPageAsMarkdown(title, url string, properties map[string]string) string {
-	var md strings.Builder
-
-	md.WriteString(fmt.Sprintf("# %s\n\n", title))
-	md.WriteString(fmt.Sprintf("**URL:** %s\n\n", url))
-
-	if len(properties) > 0 {
-		md.WriteString("## Properties\n\n")
-		for name, value := range properties {
-			if name == "title" {
-				continue
-			}
-			md.WriteString(fmt.Sprintf("- **%s:** %s\n", name, value))
-		}
-	}
-
-	return md.String()
-}
-
-// formatSearchAsMarkdown formats search results as markdown
-func formatSearchAsMarkdown(pages []types.PageSummary, hasMore bool, nextCursor string) string {
-	var md strings.Builder
-
-	for _, page := range pages {
-		md.WriteString(fmt.Sprintf("- [%s](%s)\n", page.Title, page.URL))
-	}
-
-	if hasMore {
-		md.WriteString(fmt.Sprintf("\n_More results available (cursor: %s)_\n", nextCursor))
-	}
-
-	return md.String()
 }
 
 // Internal types for API responses

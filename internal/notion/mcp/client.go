@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/longkey1/gotion/internal/gotion"
 	"github.com/longkey1/gotion/internal/notion/types"
 )
 
@@ -277,26 +278,37 @@ type mcpTextResponse struct {
 	Text     string                 `json:"text,omitempty"`
 }
 
+// ToPageOutput converts PageResult to the intermediate PageOutput structure
+func (c *Client) ToPageOutput(result *types.PageResult) *gotion.PageOutput {
+	return &gotion.PageOutput{
+		Title:   result.Title,
+		URL:     result.URL,
+		Content: result.Content,
+	}
+}
+
+// ToSearchOutput converts SearchResult to the intermediate SearchOutput structure
+// Note: MCP returns pre-formatted content, so we pass it through as-is
+func (c *Client) ToSearchOutput(result *types.SearchResult) *gotion.SearchOutput {
+	// MCP search returns pre-formatted markdown in Content field
+	// We don't have structured page data, so return empty pages
+	return &gotion.SearchOutput{
+		Pages:      nil,
+		HasMore:    false,
+		NextCursor: "",
+	}
+}
+
 // FormatPage formats a page result
 func (c *Client) FormatPage(result *types.PageResult, format types.OutputFormat) (string, error) {
 	switch format {
 	case types.FormatJSON:
 		return "", fmt.Errorf("--format=json is not supported with MCP backend")
 	case types.FormatMarkdown, "":
-		return formatWithFrontmatter(result.Title, result.URL, result.Content), nil
+		return gotion.FormatPage(c.ToPageOutput(result)), nil
 	default:
 		return "", fmt.Errorf("unsupported format: %s", format)
 	}
-}
-
-func formatWithFrontmatter(title, url, content string) string {
-	var sb strings.Builder
-	sb.WriteString("---\n")
-	sb.WriteString(fmt.Sprintf("title: %q\n", title))
-	sb.WriteString(fmt.Sprintf("url: %s\n", url))
-	sb.WriteString("---\n\n")
-	sb.WriteString(content)
-	return sb.String()
 }
 
 // FormatSearch formats a search result
@@ -305,7 +317,11 @@ func (c *Client) FormatSearch(result *types.SearchResult, format types.OutputFor
 	case types.FormatJSON:
 		return "", fmt.Errorf("--format=json is not supported with MCP backend")
 	case types.FormatMarkdown, "":
-		return result.Content, nil
+		// MCP returns pre-formatted content, use it directly
+		if result.Content != "" {
+			return result.Content, nil
+		}
+		return gotion.FormatSearch(c.ToSearchOutput(result)), nil
 	default:
 		return "", fmt.Errorf("unsupported format: %s", format)
 	}
