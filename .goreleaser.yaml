@@ -63,7 +63,7 @@ brews:
   - repository:
       owner: longkey1
       name: homebrew-tap
-    folder: Formula
+    directory: Formula
     homepage: "https://github.com/longkey1/gotion"
     description: "A CLI tool for Notion API"
     license: "MIT"
