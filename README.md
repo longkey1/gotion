@@ -66,13 +66,13 @@ Configure credentials:
 ```bash
 # Environment variables
 export GOTION_BACKEND="api"
-export GOTION_CLIENT_ID="your-client-id"
-export GOTION_CLIENT_SECRET="your-client-secret"
+export GOTION_API_CLIENT_ID="your-client-id"
+export GOTION_API_CLIENT_SECRET="your-client-secret"
 
 # Or config file (~/.config/gotion/config.toml)
 backend = "api"
-client_id = "your-client-id"
-client_secret = "your-client-secret"
+api_client_id = "your-client-id"
+api_client_secret = "your-client-secret"
 ```
 
 Run authentication:
@@ -86,7 +86,7 @@ gotion auth
 Use an Internal Integration token directly (skips OAuth):
 
 ```bash
-export GOTION_TOKEN="secret_xxxxxxxx"
+export GOTION_API_TOKEN="secret_xxxxxxxx"
 # or
 export NOTION_TOKEN="secret_xxxxxxxx"
 ```
@@ -145,9 +145,9 @@ All config file settings can be overridden with environment variables:
 | Environment Variable | Config Key | Description |
 |---------------------|------------|-------------|
 | `GOTION_BACKEND` | `backend` | API backend (`api` or `mcp`) |
-| `GOTION_CLIENT_ID` | `client_id` | OAuth client ID |
-| `GOTION_CLIENT_SECRET` | `client_secret` | OAuth client secret |
-| `GOTION_TOKEN` | - | Direct API token |
+| `GOTION_API_CLIENT_ID` | `api_client_id` | OAuth client ID |
+| `GOTION_API_CLIENT_SECRET` | `api_client_secret` | OAuth client secret |
+| `GOTION_API_TOKEN` | `api_token` | Direct API token |
 | `NOTION_TOKEN` | - | Direct API token (fallback) |
 
 Priority: Environment variables > Config file > Token file

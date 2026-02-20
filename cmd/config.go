@@ -72,19 +72,19 @@ func runConfig() error {
 
 	// Check environment variables
 	if os.Getenv("GOTION_BACKEND") != "" {
-		fmt.Println("GOTION_BACKEND:        set")
+		fmt.Println("GOTION_BACKEND:           set")
 	}
-	if os.Getenv("GOTION_TOKEN") != "" {
-		fmt.Println("GOTION_TOKEN:          set")
+	if os.Getenv("GOTION_API_TOKEN") != "" {
+		fmt.Println("GOTION_API_TOKEN:         set")
 	}
 	if os.Getenv("NOTION_TOKEN") != "" {
-		fmt.Println("NOTION_TOKEN:          set")
+		fmt.Println("NOTION_TOKEN:             set")
 	}
-	if os.Getenv("GOTION_CLIENT_ID") != "" {
-		fmt.Println("GOTION_CLIENT_ID:      set")
+	if os.Getenv("GOTION_API_CLIENT_ID") != "" {
+		fmt.Println("GOTION_API_CLIENT_ID:     set")
 	}
-	if os.Getenv("GOTION_CLIENT_SECRET") != "" {
-		fmt.Println("GOTION_CLIENT_SECRET:  set")
+	if os.Getenv("GOTION_API_CLIENT_SECRET") != "" {
+		fmt.Println("GOTION_API_CLIENT_SECRET: set")
 	}
 
 	// Check config file

@@ -24,9 +24,9 @@ const (
 
 // Config holds the application configuration
 type Config struct {
-	Token        string  `mapstructure:"token"`
-	ClientID     string  `mapstructure:"client_id"`
-	ClientSecret string  `mapstructure:"client_secret"`
+	Token        string  `mapstructure:"api_token"`
+	ClientID     string  `mapstructure:"api_client_id"`
+	ClientSecret string  `mapstructure:"api_client_secret"`
 	Backend      Backend `mapstructure:"backend"`
 }
 
@@ -60,11 +60,11 @@ func Load() (*Config, error) {
 	v.SetEnvPrefix(EnvPrefix)
 	v.AutomaticEnv()
 
-	// Bind environment variables explicitly for underscore keys
+	// Bind environment variables explicitly
 	_ = v.BindEnv("backend", "GOTION_BACKEND")
-	_ = v.BindEnv("client_id", "GOTION_CLIENT_ID")
-	_ = v.BindEnv("client_secret", "GOTION_CLIENT_SECRET")
-	_ = v.BindEnv("token", "GOTION_TOKEN")
+	_ = v.BindEnv("api_client_id", "GOTION_API_CLIENT_ID")
+	_ = v.BindEnv("api_client_secret", "GOTION_API_CLIENT_SECRET")
+	_ = v.BindEnv("api_token", "GOTION_API_TOKEN")
 
 	// Load config file
 	configDir, err := GetConfigDir()
@@ -118,10 +118,10 @@ func LoadOAuthConfig() (*Config, error) {
 	v.SetEnvPrefix(EnvPrefix)
 	v.AutomaticEnv()
 
-	// Bind environment variables explicitly for underscore keys
+	// Bind environment variables explicitly
 	_ = v.BindEnv("backend", "GOTION_BACKEND")
-	_ = v.BindEnv("client_id", "GOTION_CLIENT_ID")
-	_ = v.BindEnv("client_secret", "GOTION_CLIENT_SECRET")
+	_ = v.BindEnv("api_client_id", "GOTION_API_CLIENT_ID")
+	_ = v.BindEnv("api_client_secret", "GOTION_API_CLIENT_SECRET")
 
 	// Try to load from config file
 	configDir, err := GetConfigDir()
@@ -232,7 +232,7 @@ func DeleteToken() error {
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
 	if c.Token == "" {
-		return fmt.Errorf("token is required. Run 'gotion auth login' or set GOTION_TOKEN/NOTION_TOKEN environment variable")
+		return fmt.Errorf("token is required. Run 'gotion auth' or set GOTION_API_TOKEN/NOTION_TOKEN environment variable")
 	}
 	return nil
 }
@@ -240,10 +240,10 @@ func (c *Config) Validate() error {
 // ValidateOAuth checks if the OAuth configuration is valid
 func (c *Config) ValidateOAuth() error {
 	if c.ClientID == "" {
-		return fmt.Errorf("client_id is required. Set GOTION_CLIENT_ID environment variable or configure in ~/.config/gotion/config.toml")
+		return fmt.Errorf("api_client_id is required. Set GOTION_API_CLIENT_ID environment variable or configure in ~/.config/gotion/config.toml")
 	}
 	if c.ClientSecret == "" {
-		return fmt.Errorf("client_secret is required. Set GOTION_CLIENT_SECRET environment variable or configure in ~/.config/gotion/config.toml")
+		return fmt.Errorf("api_client_secret is required. Set GOTION_API_CLIENT_SECRET environment variable or configure in ~/.config/gotion/config.toml")
 	}
 	return nil
 }
