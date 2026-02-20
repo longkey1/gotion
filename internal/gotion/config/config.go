@@ -24,22 +24,23 @@ const (
 
 // Config holds the application configuration
 type Config struct {
-	Token        string `mapstructure:"token"`
-	ClientID     string `mapstructure:"client_id"`
-	ClientSecret string `mapstructure:"client_secret"`
+	Token        string  `mapstructure:"token"`
+	ClientID     string  `mapstructure:"client_id"`
+	ClientSecret string  `mapstructure:"client_secret"`
+	Backend      Backend `mapstructure:"backend"`
 }
 
-// AuthType represents the type of authentication used
-type AuthType string
+// Backend represents which Notion API backend to use
+type Backend string
 
 const (
-	AuthTypeAPI AuthType = "api"
-	AuthTypeMCP AuthType = "mcp"
+	BackendAPI Backend = "api"
+	BackendMCP Backend = "mcp"
 )
 
 // TokenData holds the OAuth token data
 type TokenData struct {
-	AuthType      AuthType `json:"auth_type,omitempty"`
+	Backend       Backend  `json:"backend"`
 	AccessToken   string   `json:"access_token"`
 	TokenType     string   `json:"token_type"`
 	BotID         string   `json:"bot_id,omitempty"`
@@ -71,7 +72,11 @@ func Load() (*Config, error) {
 	// Try to load OAuth token from token file
 	tokenData, err := LoadToken()
 	if err == nil && tokenData.AccessToken != "" {
-		cfg := &Config{Token: tokenData.AccessToken}
+		cfg := &Config{
+			Token:    tokenData.AccessToken,
+			Backend:  tokenData.Backend,
+			ClientID: tokenData.ClientID,
+		}
 		// Also load OAuth settings from config file for potential refresh
 		loadOAuthSettings(cfg)
 		return cfg, nil

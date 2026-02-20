@@ -12,6 +12,8 @@ import (
 
 	"github.com/longkey1/gotion/internal/gotion"
 	"github.com/longkey1/gotion/internal/gotion/config"
+	"github.com/longkey1/gotion/internal/notion/api"
+	"github.com/longkey1/gotion/internal/notion/mcp"
 	"github.com/spf13/cobra"
 )
 
@@ -86,7 +88,7 @@ func runMCPAuth(ctx context.Context, opts *authOptions) error {
 	fmt.Println("Using MCP OAuth (Dynamic Client Registration)...")
 
 	// Create MCP OAuth client
-	mcpClient := gotion.NewMCPOAuthClient(callbackURL)
+	mcpClient := mcp.NewOAuthClient(callbackURL)
 
 	// Step 1: Discover OAuth endpoints
 	fmt.Println("Discovering OAuth endpoints...")
@@ -158,7 +160,7 @@ func runMCPAuth(ctx context.Context, opts *authOptions) error {
 
 	// Save token with client_id for future refresh
 	tokenData := &config.TokenData{
-		AuthType:     config.AuthTypeMCP,
+		Backend:      config.BackendMCP,
 		AccessToken:  token.AccessToken,
 		TokenType:    token.TokenType,
 		ClientID:     mcpClient.GetClientID(),
@@ -198,7 +200,7 @@ func runTraditionalAuth(ctx context.Context, opts *authOptions, cfg *config.Conf
 	}
 
 	// Create OAuth client
-	oauthClient := gotion.NewOAuthClient(&gotion.OAuthConfig{
+	oauthClient := api.NewOAuthClient(&api.OAuthConfig{
 		ClientID:     cfg.ClientID,
 		ClientSecret: cfg.ClientSecret,
 		RedirectURI:  redirectURI,
@@ -240,7 +242,7 @@ func runTraditionalAuth(ctx context.Context, opts *authOptions, cfg *config.Conf
 
 	// Save token
 	tokenData := &config.TokenData{
-		AuthType:      config.AuthTypeAPI,
+		Backend:       config.BackendAPI,
 		AccessToken:   token.AccessToken,
 		TokenType:     token.TokenType,
 		BotID:         token.BotID,

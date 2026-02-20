@@ -7,6 +7,7 @@ import (
 
 	"github.com/longkey1/gotion/internal/gotion"
 	"github.com/longkey1/gotion/internal/gotion/config"
+	"github.com/longkey1/gotion/internal/notion"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +50,11 @@ func runList(ctx context.Context, opts *listOptions) error {
 		return err
 	}
 
-	client := gotion.NewClient(cfg.Token)
+	// Create client based on auth type
+	client, err := notion.NewClient(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
 
 	// Validate and clamp page size
 	pageSize := opts.pageSize
@@ -60,33 +65,40 @@ func runList(ctx context.Context, opts *listOptions) error {
 		pageSize = 100
 	}
 
-	// Build search request
-	searchReq := &gotion.SearchRequest{
-		Query:    opts.query,
-		PageSize: pageSize,
-		Filter: &gotion.SearchFilter{
-			Value:    "page",
-			Property: "object",
-		},
+	// Build search options
+	searchOpts := &notion.SearchOptions{
+		PageSize:    pageSize,
+		StartCursor: opts.cursor,
+		Sort:        opts.sort,
 	}
 
-	if opts.cursor != "" {
-		searchReq.StartCursor = opts.cursor
-	}
-
-	// Set sort order
-	if opts.sort == "ascending" || opts.sort == "descending" {
-		searchReq.Sort = &gotion.SearchSort{
-			Direction: opts.sort,
-			Timestamp: "last_edited_time",
-		}
-	}
-
-	resp, err := client.Search(ctx, searchReq)
+	result, err := client.Search(ctx, opts.query, searchOpts)
 	if err != nil {
 		return fmt.Errorf("failed to search: %w", err)
 	}
 
-	formatter := gotion.NewFormatter(gotion.OutputFormat(opts.format), os.Stdout)
-	return formatter.FormatPages(resp.Results, resp.NextCursor, resp.HasMore)
+	// Output based on source
+	if result.Source == "mcp" {
+		// MCP returns content directly
+		fmt.Println(result.Content)
+	} else {
+		// API returns structured data - convert to gotion.Page for formatting
+		var pages []gotion.Page
+		for _, p := range result.Pages {
+			pages = append(pages, gotion.Page{
+				ID:  p.ID,
+				URL: p.URL,
+				Properties: map[string]gotion.Property{
+					"title": {
+						Type:  "title",
+						Title: []gotion.RichText{{PlainText: p.Title}},
+					},
+				},
+			})
+		}
+		formatter := gotion.NewFormatter(gotion.OutputFormat(opts.format), os.Stdout)
+		return formatter.FormatPages(pages, result.NextCursor, result.HasMore)
+	}
+
+	return nil
 }
