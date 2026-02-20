@@ -267,6 +267,30 @@ type toolContent struct {
 	Text string `json:"text,omitempty"`
 }
 
+// FormatPage formats a page result
+func (c *Client) FormatPage(result *types.PageResult, format types.OutputFormat) (string, error) {
+	switch format {
+	case types.FormatJSON:
+		return "", fmt.Errorf("--format=json is not supported with MCP backend")
+	case types.FormatMarkdown, "":
+		return result.Content, nil
+	default:
+		return "", fmt.Errorf("unsupported format: %s", format)
+	}
+}
+
+// FormatSearch formats a search result
+func (c *Client) FormatSearch(result *types.SearchResult, format types.OutputFormat) (string, error) {
+	switch format {
+	case types.FormatJSON:
+		return "", fmt.Errorf("--format=json is not supported with MCP backend")
+	case types.FormatMarkdown, "":
+		return result.Content, nil
+	default:
+		return "", fmt.Errorf("unsupported format: %s", format)
+	}
+}
+
 func extractTextContent(result *toolResult) string {
 	if result == nil || len(result.Content) == 0 {
 		return ""

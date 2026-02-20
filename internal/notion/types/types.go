@@ -2,6 +2,14 @@ package types
 
 import "context"
 
+// OutputFormat represents the output format
+type OutputFormat string
+
+const (
+	FormatMarkdown OutputFormat = "markdown"
+	FormatJSON     OutputFormat = "json"
+)
+
 // Client defines the interface for Notion API operations
 type Client interface {
 	// GetPage retrieves a page by ID
@@ -9,6 +17,12 @@ type Client interface {
 
 	// Search searches for pages
 	Search(ctx context.Context, query string, opts *SearchOptions) (*SearchResult, error)
+
+	// FormatPage formats a page result
+	FormatPage(result *PageResult, format OutputFormat) (string, error)
+
+	// FormatSearch formats a search result
+	FormatSearch(result *SearchResult, format OutputFormat) (string, error)
 }
 
 // GetPageOptions contains options for GetPage
@@ -25,31 +39,23 @@ type SearchOptions struct {
 
 // PageResult represents the result of GetPage
 type PageResult struct {
-	// For API client
-	ID         string
-	Title      string
-	URL        string
-	Properties map[string]string
-
-	// For MCP client (raw content)
-	Content string
-
-	// Source indicates which client produced this result
-	Source string // "api" or "mcp"
+	ID      string
+	Title   string
+	URL     string
+	Content string            // Markdown content
+	RawJSON []byte            // Raw JSON (API only)
+	Props   map[string]string // Properties
+	Source  string            // "api" or "mcp"
 }
 
 // SearchResult represents the result of Search
 type SearchResult struct {
-	// For API client
 	Pages      []PageSummary
 	HasMore    bool
 	NextCursor string
-
-	// For MCP client (raw content)
-	Content string
-
-	// Source indicates which client produced this result
-	Source string // "api" or "mcp"
+	Content    string // Markdown content
+	RawJSON    []byte // Raw JSON (API only)
+	Source     string // "api" or "mcp"
 }
 
 // PageSummary represents a summary of a page in search results

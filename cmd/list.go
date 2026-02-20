@@ -3,11 +3,10 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 
-	"github.com/longkey1/gotion/internal/gotion"
 	"github.com/longkey1/gotion/internal/gotion/config"
 	"github.com/longkey1/gotion/internal/notion"
+	"github.com/longkey1/gotion/internal/notion/types"
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +32,7 @@ var listCmd = &cobra.Command{
 func init() {
 	listCmd.Flags().StringVarP(&listOpts.query, "query", "q", "", "Search keyword")
 	listCmd.Flags().IntVarP(&listOpts.pageSize, "page-size", "n", 10, "Number of results to retrieve (max 100)")
-	listCmd.Flags().StringVarP(&listOpts.format, "format", "f", "table", "Output format: json, text, table")
+	listCmd.Flags().StringVarP(&listOpts.format, "format", "f", "", "Output format: json (API backend only)")
 	listCmd.Flags().StringVar(&listOpts.sort, "sort", "descending", "Sort order: ascending, descending")
 	listCmd.Flags().StringVar(&listOpts.cursor, "cursor", "", "Pagination cursor")
 
@@ -50,7 +49,7 @@ func runList(ctx context.Context, opts *listOptions) error {
 		return err
 	}
 
-	// Create client based on auth type
+	// Create client based on backend
 	client, err := notion.NewClient(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
@@ -77,28 +76,12 @@ func runList(ctx context.Context, opts *listOptions) error {
 		return fmt.Errorf("failed to search: %w", err)
 	}
 
-	// Output based on source
-	if result.Source == "mcp" {
-		// MCP returns content directly
-		fmt.Println(result.Content)
-	} else {
-		// API returns structured data - convert to gotion.Page for formatting
-		var pages []gotion.Page
-		for _, p := range result.Pages {
-			pages = append(pages, gotion.Page{
-				ID:  p.ID,
-				URL: p.URL,
-				Properties: map[string]gotion.Property{
-					"title": {
-						Type:  "title",
-						Title: []gotion.RichText{{PlainText: p.Title}},
-					},
-				},
-			})
-		}
-		formatter := gotion.NewFormatter(gotion.OutputFormat(opts.format), os.Stdout)
-		return formatter.FormatPages(pages, result.NextCursor, result.HasMore)
+	// Format output
+	output, err := client.FormatSearch(result, types.OutputFormat(opts.format))
+	if err != nil {
+		return err
 	}
 
+	fmt.Print(output)
 	return nil
 }

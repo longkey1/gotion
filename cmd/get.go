@@ -3,12 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/longkey1/gotion/internal/gotion"
 	"github.com/longkey1/gotion/internal/gotion/config"
 	"github.com/longkey1/gotion/internal/notion"
+	"github.com/longkey1/gotion/internal/notion/types"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +30,7 @@ var getCmd = &cobra.Command{
 }
 
 func init() {
-	getCmd.Flags().StringVarP(&getOpts.format, "format", "f", "text", "Output format: json, text, table")
+	getCmd.Flags().StringVarP(&getOpts.format, "format", "f", "", "Output format: json (API backend only)")
 	getCmd.Flags().StringVar(&getOpts.filterProperties, "filter-properties", "", "Filter properties to retrieve (comma-separated)")
 
 	rootCmd.AddCommand(getCmd)
@@ -49,44 +49,36 @@ func runGet(ctx context.Context, pageIDOrURL string, opts *getOptions) error {
 	// Extract page ID from URL if needed
 	pageID := gotion.ExtractPageID(pageIDOrURL)
 
-	// Create client based on auth type
+	// Create client based on backend
 	client, err := notion.NewClient(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
 	// Build options
-	var getOpts *notion.GetPageOptions
+	var getPageOpts *notion.GetPageOptions
 	if opts.filterProperties != "" {
 		filterProps := strings.Split(opts.filterProperties, ",")
 		for i := range filterProps {
 			filterProps[i] = strings.TrimSpace(filterProps[i])
 		}
-		getOpts = &notion.GetPageOptions{
+		getPageOpts = &notion.GetPageOptions{
 			FilterProperties: filterProps,
 		}
 	}
 
 	// Get page
-	result, err := client.GetPage(ctx, pageID, getOpts)
+	result, err := client.GetPage(ctx, pageID, getPageOpts)
 	if err != nil {
 		return fmt.Errorf("failed to get page: %w", err)
 	}
 
-	// Output based on source
-	if result.Source == "mcp" {
-		// MCP returns content directly
-		fmt.Println(result.Content)
-	} else {
-		// API returns structured data
-		formatter := gotion.NewFormatter(gotion.OutputFormat(opts.format), os.Stdout)
-		// Convert to gotion.Page for formatting
-		page := &gotion.Page{
-			ID:    result.ID,
-			URL:   result.URL,
-		}
-		return formatter.FormatPage(page)
+	// Format output
+	output, err := client.FormatPage(result, types.OutputFormat(opts.format))
+	if err != nil {
+		return err
 	}
 
+	fmt.Print(output)
 	return nil
 }
