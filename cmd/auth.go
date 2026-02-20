@@ -156,10 +156,14 @@ func runMCPAuth(ctx context.Context, opts *authOptions) error {
 		return fmt.Errorf("failed to exchange code: %w", err)
 	}
 
-	// Save token
+	// Save token with client_id for future refresh
 	tokenData := &config.TokenData{
-		AccessToken: token.AccessToken,
-		TokenType:   token.TokenType,
+		AuthType:     config.AuthTypeMCP,
+		AccessToken:  token.AccessToken,
+		TokenType:    token.TokenType,
+		ClientID:     mcpClient.GetClientID(),
+		RefreshToken: token.RefreshToken,
+		ExpiresAt:    token.ExpiresAt,
 	}
 
 	if err := config.SaveToken(tokenData); err != nil {
@@ -236,6 +240,7 @@ func runTraditionalAuth(ctx context.Context, opts *authOptions, cfg *config.Conf
 
 	// Save token
 	tokenData := &config.TokenData{
+		AuthType:      config.AuthTypeAPI,
 		AccessToken:   token.AccessToken,
 		TokenType:     token.TokenType,
 		BotID:         token.BotID,

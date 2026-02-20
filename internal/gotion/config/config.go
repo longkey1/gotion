@@ -29,13 +29,25 @@ type Config struct {
 	ClientSecret string `mapstructure:"client_secret"`
 }
 
+// AuthType represents the type of authentication used
+type AuthType string
+
+const (
+	AuthTypeAPI AuthType = "api"
+	AuthTypeMCP AuthType = "mcp"
+)
+
 // TokenData holds the OAuth token data
 type TokenData struct {
-	AccessToken   string `json:"access_token"`
-	TokenType     string `json:"token_type"`
-	BotID         string `json:"bot_id"`
-	WorkspaceID   string `json:"workspace_id"`
-	WorkspaceName string `json:"workspace_name"`
+	AuthType      AuthType `json:"auth_type,omitempty"`
+	AccessToken   string   `json:"access_token"`
+	TokenType     string   `json:"token_type"`
+	BotID         string   `json:"bot_id,omitempty"`
+	WorkspaceID   string   `json:"workspace_id,omitempty"`
+	WorkspaceName string   `json:"workspace_name,omitempty"`
+	ClientID      string   `json:"client_id,omitempty"`
+	RefreshToken  string   `json:"refresh_token,omitempty"`
+	ExpiresAt     int64    `json:"expires_at,omitempty"`
 }
 
 // Load loads configuration from environment variables and config file
