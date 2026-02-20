@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/longkey1/gotion/internal/gotion"
 	"github.com/longkey1/gotion/internal/notion/types"
 )
 
@@ -52,13 +51,13 @@ func (c *Client) GetPage(ctx context.Context, pageID string, opts *types.GetPage
 		return nil, err
 	}
 
-	title, url, content := extractPageContent(result)
+	title, url := extractPageMetadata(result.Result)
 
 	return &types.PageResult{
 		ID:      pageID,
 		Title:   title,
 		URL:     url,
-		Content: content,
+		RawJSON: result.ContentJSON,
 		Source:  "mcp",
 	}, nil
 }
@@ -82,10 +81,8 @@ func (c *Client) Search(ctx context.Context, query string, opts *types.SearchOpt
 		return nil, err
 	}
 
-	content := extractTextContent(result)
-
 	return &types.SearchResult{
-		Content: content,
+		RawJSON: result.ContentJSON,
 		Source:  "mcp",
 	}, nil
 }
@@ -123,7 +120,13 @@ func (c *Client) ensureInitialized(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) callTool(ctx context.Context, name string, args map[string]interface{}) (*toolResult, error) {
+// callToolResult holds both parsed result and content JSON
+type callToolResult struct {
+	Result      *toolResult
+	ContentJSON []byte
+}
+
+func (c *Client) callTool(ctx context.Context, name string, args map[string]interface{}) (*callToolResult, error) {
 	params := map[string]interface{}{
 		"name":      name,
 		"arguments": args,
@@ -150,7 +153,16 @@ func (c *Client) callTool(ctx context.Context, name string, args map[string]inte
 		return nil, fmt.Errorf("MCP error: unknown error")
 	}
 
-	return &result, nil
+	// Marshal only content array
+	contentJSON, err := json.MarshalIndent(result.Content, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal content: %w", err)
+	}
+
+	return &callToolResult{
+		Result:      &result,
+		ContentJSON: contentJSON,
+	}, nil
 }
 
 func (c *Client) sendRequest(ctx context.Context, method string, params interface{}) (*jsonRPCResponse, error) {
@@ -300,74 +312,30 @@ type mcpTextResponse struct {
 	Text     string                 `json:"text,omitempty"`
 }
 
-// ToPageOutput converts PageResult to the intermediate PageOutput structure
-func (c *Client) ToPageOutput(result *types.PageResult) *gotion.PageOutput {
-	return &gotion.PageOutput{
-		Title:   result.Title,
-		URL:     result.URL,
-		Content: result.Content,
-	}
+// FormatPage formats a page result as JSON string
+func (c *Client) FormatPage(result *types.PageResult) (string, error) {
+	return string(result.RawJSON), nil
 }
 
-// ToSearchOutput converts SearchResult to the intermediate SearchOutput structure
-// Note: MCP returns pre-formatted content, so we pass it through as-is
-func (c *Client) ToSearchOutput(result *types.SearchResult) *gotion.SearchOutput {
-	// MCP search returns pre-formatted markdown in Content field
-	// We don't have structured page data, so return empty pages
-	return &gotion.SearchOutput{
-		Pages:      nil,
-		HasMore:    false,
-		NextCursor: "",
-	}
+// FormatSearch formats a search result as JSON string
+func (c *Client) FormatSearch(result *types.SearchResult) (string, error) {
+	return string(result.RawJSON), nil
 }
 
-// FormatPage formats a page result
-func (c *Client) FormatPage(result *types.PageResult, format types.OutputFormat) (string, error) {
-	switch format {
-	case types.FormatJSON:
-		return "", fmt.Errorf("--format=json is not supported with MCP backend")
-	case types.FormatMarkdown, "":
-		return gotion.FormatPage(c.ToPageOutput(result)), nil
-	default:
-		return "", fmt.Errorf("unsupported format: %s", format)
-	}
-}
-
-// FormatSearch formats a search result
-func (c *Client) FormatSearch(result *types.SearchResult, format types.OutputFormat) (string, error) {
-	switch format {
-	case types.FormatJSON:
-		return "", fmt.Errorf("--format=json is not supported with MCP backend")
-	case types.FormatMarkdown, "":
-		// MCP returns pre-formatted content, use it directly
-		if result.Content != "" {
-			return result.Content, nil
-		}
-		return gotion.FormatSearch(c.ToSearchOutput(result)), nil
-	default:
-		return "", fmt.Errorf("unsupported format: %s", format)
-	}
-}
-
-func extractPageContent(result *toolResult) (title, url, content string) {
+// extractPageMetadata extracts title and url from MCP tool result content
+func extractPageMetadata(result *toolResult) (title, url string) {
 	if result == nil || len(result.Content) == 0 {
-		return "", "", ""
+		return "", ""
 	}
 
 	for _, c := range result.Content {
 		if c.Type == "text" {
 			var resp mcpTextResponse
 			if err := json.Unmarshal([]byte(c.Text), &resp); err == nil {
-				return resp.Title, resp.URL, resp.Text
+				return resp.Title, resp.URL
 			}
-			return "", "", c.Text
 		}
 	}
 
-	return "", "", ""
-}
-
-func extractTextContent(result *toolResult) string {
-	_, _, content := extractPageContent(result)
-	return content
+	return "", ""
 }

@@ -6,14 +6,12 @@ import (
 
 	"github.com/longkey1/gotion/internal/gotion/config"
 	"github.com/longkey1/gotion/internal/notion"
-	"github.com/longkey1/gotion/internal/notion/types"
 	"github.com/spf13/cobra"
 )
 
 type listOptions struct {
 	query    string
 	pageSize int
-	format   string
 	sort     string
 	cursor   string
 }
@@ -32,7 +30,6 @@ var listCmd = &cobra.Command{
 func init() {
 	listCmd.Flags().StringVarP(&listOpts.query, "query", "q", "", "Search keyword")
 	listCmd.Flags().IntVarP(&listOpts.pageSize, "page-size", "n", 10, "Number of results to retrieve (max 100)")
-	listCmd.Flags().StringVarP(&listOpts.format, "format", "f", "", "Output format: json (API backend only)")
 	listCmd.Flags().StringVar(&listOpts.sort, "sort", "descending", "Sort order: ascending, descending")
 	listCmd.Flags().StringVar(&listOpts.cursor, "cursor", "", "Pagination cursor")
 
@@ -77,7 +74,7 @@ func runList(ctx context.Context, opts *listOptions) error {
 	}
 
 	// Format output
-	output, err := client.FormatSearch(result, types.OutputFormat(opts.format))
+	output, err := client.FormatSearch(result)
 	if err != nil {
 		return err
 	}

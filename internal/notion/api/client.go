@@ -32,17 +32,141 @@ func NewClient(token string) *Client {
 	}
 }
 
-// GetPage retrieves a page by ID
+// GetPage retrieves a page by ID including its block children
 func (c *Client) GetPage(ctx context.Context, pageID string, opts *types.GetPageOptions) (*types.PageResult, error) {
 	pageID = normalizeID(pageID)
 
-	url := fmt.Sprintf("%s/pages/%s", baseURL, pageID)
+	// Fetch page metadata
+	pageURL := fmt.Sprintf("%s/pages/%s", baseURL, pageID)
 
 	if opts != nil && len(opts.FilterProperties) > 0 {
-		url += "?filter_properties=" + strings.Join(opts.FilterProperties, "&filter_properties=")
+		pageURL += "?filter_properties=" + strings.Join(opts.FilterProperties, "&filter_properties=")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	pageBody, err := c.doRequest(ctx, http.MethodGet, pageURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get page: %w", err)
+	}
+
+	var page pageResponse
+	if err := json.Unmarshal(pageBody, &page); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal page response: %w", err)
+	}
+
+	// Fetch all block children (with pagination)
+	blocks, err := c.getAllBlockChildren(ctx, pageID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block children: %w", err)
+	}
+
+	// Combine page and blocks into a single response
+	combinedResponse := map[string]interface{}{
+		"page":   json.RawMessage(pageBody),
+		"blocks": blocks,
+	}
+
+	combinedJSON, err := json.MarshalIndent(combinedResponse, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal combined response: %w", err)
+	}
+
+	title := extractTitle(page.Properties)
+	properties := extractProperties(page.Properties)
+
+	result := &types.PageResult{
+		ID:      page.ID,
+		URL:     page.URL,
+		Title:   title,
+		Props:   properties,
+		RawJSON: combinedJSON,
+		Source:  "api",
+	}
+
+	return result, nil
+}
+
+// getAllBlockChildren fetches all block children with pagination and recursively fetches nested children
+func (c *Client) getAllBlockChildren(ctx context.Context, blockID string) ([]json.RawMessage, error) {
+	var allBlocks []json.RawMessage
+	var cursor string
+
+	for {
+		blocksURL := fmt.Sprintf("%s/blocks/%s/children", baseURL, blockID)
+		if cursor != "" {
+			blocksURL += "?start_cursor=" + cursor
+		}
+
+		body, err := c.doRequest(ctx, http.MethodGet, blocksURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var blocksResp blocksResponse
+		if err := json.Unmarshal(body, &blocksResp); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal blocks response: %w", err)
+		}
+
+		// Process each block and recursively fetch children if needed
+		for _, rawBlock := range blocksResp.Results {
+			block, err := c.processBlockWithChildren(ctx, rawBlock)
+			if err != nil {
+				return nil, err
+			}
+			allBlocks = append(allBlocks, block)
+		}
+
+		if !blocksResp.HasMore {
+			break
+		}
+		cursor = blocksResp.NextCursor
+	}
+
+	return allBlocks, nil
+}
+
+// processBlockWithChildren checks if a block has children and recursively fetches them
+func (c *Client) processBlockWithChildren(ctx context.Context, rawBlock json.RawMessage) (json.RawMessage, error) {
+	var block blockInfo
+	if err := json.Unmarshal(rawBlock, &block); err != nil {
+		return rawBlock, nil // Return as-is if we can't parse
+	}
+
+	if !block.HasChildren {
+		return rawBlock, nil
+	}
+
+	// Fetch children recursively
+	children, err := c.getAllBlockChildren(ctx, block.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch children for block %s: %w", block.ID, err)
+	}
+
+	// Parse the original block as a map to add children
+	var blockMap map[string]interface{}
+	if err := json.Unmarshal(rawBlock, &blockMap); err != nil {
+		return rawBlock, nil
+	}
+
+	// Add children to the block
+	blockMap["children"] = children
+
+	// Re-marshal with children included
+	enrichedBlock, err := json.Marshal(blockMap)
+	if err != nil {
+		return rawBlock, nil
+	}
+
+	return enrichedBlock, nil
+}
+
+// doRequest performs an HTTP request and returns the response body
+func (c *Client) doRequest(ctx context.Context, method, url string, reqBody []byte) ([]byte, error) {
+	var bodyReader io.Reader
+	if reqBody != nil {
+		bodyReader = bytes.NewReader(reqBody)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -68,24 +192,7 @@ func (c *Client) GetPage(ctx context.Context, pageID string, opts *types.GetPage
 		return nil, &apiErr
 	}
 
-	var page pageResponse
-	if err := json.Unmarshal(body, &page); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	title := extractTitle(page.Properties)
-	properties := extractProperties(page.Properties)
-
-	result := &types.PageResult{
-		ID:      page.ID,
-		URL:     page.URL,
-		Title:   title,
-		Props:   properties,
-		RawJSON: body,
-		Source:  "api",
-	}
-
-	return result, nil
+	return body, nil
 }
 
 // Search searches for pages
@@ -207,28 +314,14 @@ func (c *Client) ToSearchOutput(result *types.SearchResult) *gotion.SearchOutput
 	}
 }
 
-// FormatPage formats a page result
-func (c *Client) FormatPage(result *types.PageResult, format types.OutputFormat) (string, error) {
-	switch format {
-	case types.FormatJSON:
-		return string(result.RawJSON), nil
-	case types.FormatMarkdown, "":
-		return gotion.FormatPage(c.ToPageOutput(result)), nil
-	default:
-		return "", fmt.Errorf("unsupported format: %s", format)
-	}
+// FormatPage formats a page result as JSON string
+func (c *Client) FormatPage(result *types.PageResult) (string, error) {
+	return string(result.RawJSON), nil
 }
 
-// FormatSearch formats a search result
-func (c *Client) FormatSearch(result *types.SearchResult, format types.OutputFormat) (string, error) {
-	switch format {
-	case types.FormatJSON:
-		return string(result.RawJSON), nil
-	case types.FormatMarkdown, "":
-		return gotion.FormatSearch(c.ToSearchOutput(result)), nil
-	default:
-		return "", fmt.Errorf("unsupported format: %s", format)
-	}
+// FormatSearch formats a search result as JSON string
+func (c *Client) FormatSearch(result *types.SearchResult) (string, error) {
+	return string(result.RawJSON), nil
 }
 
 func (c *Client) setHeaders(req *http.Request) {
@@ -281,6 +374,17 @@ type searchResponse struct {
 	Results    []pageResponse `json:"results"`
 	NextCursor string         `json:"next_cursor"`
 	HasMore    bool           `json:"has_more"`
+}
+
+type blocksResponse struct {
+	Results    []json.RawMessage `json:"results"`
+	NextCursor string            `json:"next_cursor"`
+	HasMore    bool              `json:"has_more"`
+}
+
+type blockInfo struct {
+	ID          string `json:"id"`
+	HasChildren bool   `json:"has_children"`
 }
 
 type apiError struct {

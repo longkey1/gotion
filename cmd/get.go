@@ -8,12 +8,10 @@ import (
 	"github.com/longkey1/gotion/internal/gotion"
 	"github.com/longkey1/gotion/internal/gotion/config"
 	"github.com/longkey1/gotion/internal/notion"
-	"github.com/longkey1/gotion/internal/notion/types"
 	"github.com/spf13/cobra"
 )
 
 type getOptions struct {
-	format           string
 	filterProperties string
 }
 
@@ -30,7 +28,6 @@ var getCmd = &cobra.Command{
 }
 
 func init() {
-	getCmd.Flags().StringVarP(&getOpts.format, "format", "f", "", "Output format: json (API backend only)")
 	getCmd.Flags().StringVar(&getOpts.filterProperties, "filter-properties", "", "Filter properties to retrieve (comma-separated)")
 
 	rootCmd.AddCommand(getCmd)
@@ -74,7 +71,7 @@ func runGet(ctx context.Context, pageIDOrURL string, opts *getOptions) error {
 	}
 
 	// Format output
-	output, err := client.FormatPage(result, types.OutputFormat(opts.format))
+	output, err := client.FormatPage(result)
 	if err != nil {
 		return err
 	}

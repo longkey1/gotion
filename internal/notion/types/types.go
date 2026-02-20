@@ -2,14 +2,6 @@ package types
 
 import "context"
 
-// OutputFormat represents the output format
-type OutputFormat string
-
-const (
-	FormatMarkdown OutputFormat = "markdown"
-	FormatJSON     OutputFormat = "json"
-)
-
 // Client defines the interface for Notion API operations
 type Client interface {
 	// GetPage retrieves a page by ID
@@ -18,11 +10,11 @@ type Client interface {
 	// Search searches for pages
 	Search(ctx context.Context, query string, opts *SearchOptions) (*SearchResult, error)
 
-	// FormatPage formats a page result
-	FormatPage(result *PageResult, format OutputFormat) (string, error)
+	// FormatPage formats a page result as JSON string
+	FormatPage(result *PageResult) (string, error)
 
-	// FormatSearch formats a search result
-	FormatSearch(result *SearchResult, format OutputFormat) (string, error)
+	// FormatSearch formats a search result as JSON string
+	FormatSearch(result *SearchResult) (string, error)
 }
 
 // GetPageOptions contains options for GetPage
