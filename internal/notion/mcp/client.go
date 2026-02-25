@@ -221,6 +221,7 @@ func (c *Client) sendRequest(ctx context.Context, method string, params interfac
 
 func (c *Client) parseSSEResponse(body io.Reader, expectedID int64) (*jsonRPCResponse, error) {
 	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 	var dataBuffer strings.Builder
 
 	for scanner.Scan() {
