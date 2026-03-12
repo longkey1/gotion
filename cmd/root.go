@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/longkey1/gotion/internal/gotion/config"
@@ -64,8 +65,7 @@ func refreshTokenIfNeeded() error {
 
 	newToken, err := mcp.RefreshToken(ctx, tokenData.ClientID, tokenData.RefreshToken)
 	if err != nil {
-		// Refresh failed, continue with existing token
-		return nil
+		return fmt.Errorf("token refresh failed (re-authenticate with 'gotion auth'): %w", err)
 	}
 
 	// Update token data

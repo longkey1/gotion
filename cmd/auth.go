@@ -167,6 +167,7 @@ func runMCPAuth(ctx context.Context, opts *authOptions) error {
 
 	// Save token
 	tokenData := &config.TokenData{
+		Backend:      config.BackendMCP,
 		AccessToken:  token.AccessToken,
 		TokenType:    token.TokenType,
 		ClientID:     mcpClient.GetClientID(),
