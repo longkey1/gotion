@@ -15,8 +15,8 @@ var rootCmd = &cobra.Command{
 	Short: "A CLI tool for Notion API",
 	Long:  `gotion is a command-line interface for interacting with the Notion API.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Skip token refresh for auth and config commands
-		if cmd.Name() == "auth" || cmd.Name() == "config" || cmd.Name() == "version" || cmd.Name() == "help" || cmd.Name() == "completion" {
+		// Skip token refresh for non-API commands
+		if skipTokenRefresh(cmd) {
 			return nil
 		}
 		return refreshTokenIfNeeded()
@@ -37,6 +37,17 @@ func init() {
 	// Global flags can be added here if needed
 }
 
+// skipTokenRefresh returns true if the command should not trigger token refresh
+func skipTokenRefresh(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		switch c.Name() {
+		case "auth", "config", "version", "help", "completion":
+			return true
+		}
+	}
+	return false
+}
+
 // refreshTokenIfNeeded checks and refreshes the token if expired
 func refreshTokenIfNeeded() error {
 	tokenData, err := config.LoadToken()
@@ -49,13 +60,17 @@ func refreshTokenIfNeeded() error {
 		return nil
 	}
 
-	// Only MCP tokens support refresh
-	cfg, err := config.Load()
-	if err != nil {
-		return nil
+	// Determine backend: check token data first, then config
+	backend := tokenData.Backend
+	if backend == "" {
+		cfg, err := config.Load()
+		if err != nil {
+			return nil
+		}
+		backend = cfg.Backend
 	}
 
-	if cfg.Backend != config.BackendMCP {
+	if backend != config.BackendMCP {
 		return nil
 	}
 
@@ -65,12 +80,18 @@ func refreshTokenIfNeeded() error {
 
 	newToken, err := mcp.RefreshToken(ctx, tokenData.ClientID, tokenData.RefreshToken)
 	if err != nil {
+		// Re-read token file: another process may have already refreshed it
+		reloaded, reloadErr := config.LoadToken()
+		if reloadErr == nil && reloaded.AccessToken != tokenData.AccessToken {
+			// Token was refreshed by another process, use it
+			return nil
+		}
 		return fmt.Errorf("token refresh failed (re-authenticate with 'gotion auth'): %w", err)
 	}
 
 	// Update token data
 	refreshedData := &config.TokenData{
-		Backend:      tokenData.Backend,
+		Backend:      config.BackendMCP,
 		AccessToken:  newToken.AccessToken,
 		TokenType:    newToken.TokenType,
 		ClientID:     tokenData.ClientID,
