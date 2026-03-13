@@ -51,12 +51,13 @@ func (c *Client) GetPage(ctx context.Context, pageID string, opts *types.GetPage
 		return nil, err
 	}
 
-	title, url := extractPageMetadata(result.Result)
+	title, url, content := extractPageMetadata(result.Result)
 
 	return &types.PageResult{
 		ID:      pageID,
 		Title:   title,
 		URL:     url,
+		Content: content,
 		RawJSON: result.ContentJSON,
 		Source:  "mcp",
 	}, nil
@@ -83,6 +84,84 @@ func (c *Client) Search(ctx context.Context, query string, opts *types.SearchOpt
 
 	return &types.SearchResult{
 		RawJSON: result.ContentJSON,
+		Source:  "mcp",
+	}, nil
+}
+
+// CreatePage creates a new page using the MCP API
+func (c *Client) CreatePage(ctx context.Context, opts *types.CreatePageOptions) (*types.CreatePageResult, error) {
+	if err := c.ensureInitialized(ctx); err != nil {
+		return nil, err
+	}
+
+	page := map[string]interface{}{
+		"properties": opts.Properties,
+	}
+	if opts.Content != "" {
+		page["content"] = opts.Content
+	}
+
+	args := map[string]interface{}{
+		"pages": []interface{}{page},
+	}
+
+	if opts.Parent != nil {
+		parent := map[string]interface{}{
+			"type":           opts.Parent.Type,
+			opts.Parent.Type: opts.Parent.ID,
+		}
+		args["parent"] = parent
+	}
+
+	result, err := c.callTool(ctx, "notion-create-pages", args)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create page: %w", err)
+	}
+
+	return &types.CreatePageResult{
+		RawJSON: result.ContentJSON,
+		Source:  "mcp",
+	}, nil
+}
+
+// UpdatePage updates an existing page using the MCP API
+func (c *Client) UpdatePage(ctx context.Context, pageID string, opts *types.UpdatePageOptions) (*types.UpdatePageResult, error) {
+	if err := c.ensureInitialized(ctx); err != nil {
+		return nil, err
+	}
+
+	var lastResult *callToolResult
+
+	if opts.Properties != nil && len(opts.Properties) > 0 {
+		result, err := c.callTool(ctx, "notion-update-page", map[string]interface{}{
+			"page_id":    pageID,
+			"command":    "update_properties",
+			"properties": opts.Properties,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to update properties: %w", err)
+		}
+		lastResult = result
+	}
+
+	if opts.Content != nil {
+		result, err := c.callTool(ctx, "notion-update-page", map[string]interface{}{
+			"page_id": pageID,
+			"command": "replace_content",
+			"new_str": *opts.Content,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to update content: %w", err)
+		}
+		lastResult = result
+	}
+
+	if lastResult == nil {
+		return nil, fmt.Errorf("no properties or content to update")
+	}
+
+	return &types.UpdatePageResult{
+		RawJSON: lastResult.ContentJSON,
 		Source:  "mcp",
 	}, nil
 }
@@ -323,20 +402,24 @@ func (c *Client) FormatSearch(result *types.SearchResult) (string, error) {
 	return string(result.RawJSON), nil
 }
 
-// extractPageMetadata extracts title and url from MCP tool result content
-func extractPageMetadata(result *toolResult) (title, url string) {
+// extractPageMetadata extracts title, url, and markdown content from MCP tool result content
+func extractPageMetadata(result *toolResult) (title, url, content string) {
 	if result == nil || len(result.Content) == 0 {
-		return "", ""
+		return "", "", ""
 	}
 
 	for _, c := range result.Content {
 		if c.Type == "text" {
 			var resp mcpTextResponse
 			if err := json.Unmarshal([]byte(c.Text), &resp); err == nil {
-				return resp.Title, resp.URL
+				return resp.Title, resp.URL, resp.Text
+			}
+			// If not JSON, treat as plain markdown content
+			if content == "" {
+				content = c.Text
 			}
 		}
 	}
 
-	return "", ""
+	return title, url, content
 }

@@ -101,9 +101,6 @@ gotion list -q "search keyword"
 
 # Limit results
 gotion list -q "search keyword" -n 20
-
-# Output as JSON (API backend only)
-gotion list -q "search keyword" -f json
 ```
 
 ### Get Page
@@ -112,21 +109,110 @@ gotion list -q "search keyword" -f json
 # Get page by ID or URL
 gotion get <page_id>
 
-# Output as JSON (API backend only)
-gotion get <page_id> -f json
+# Output as Markdown (MCP backend: frontmatter + content)
+gotion get <page_id> --format markdown
+
+# Output as JSON (default)
+gotion get <page_id> --format json
 
 # Filter specific properties
 gotion get <page_id> --filter-properties "title,status"
 ```
 
+### Create Page
+
+Requires MCP backend.
+
+```bash
+# Create from Markdown with frontmatter via stdin
+echo '---
+title: "New Page"
+---
+
+# Hello
+Page content here' | gotion create --parent <parent_id>
+
+# Create from file
+gotion create --parent <parent_id> --file page.md
+
+# Create with title flag
+gotion create --parent <parent_id> --title "New Page" --file content.md
+
+# Create from JSON
+echo '{"properties":{"title":"New Page"},"content":"# Hello"}' | gotion create --parent <parent_id>
+
+# Specify parent type (default: page_id)
+gotion create --parent <database_id> --parent-type database_id --file page.md
+```
+
+### Update Page
+
+Requires MCP backend.
+
+```bash
+# Update from file (properties + content)
+gotion update <page_id> --file page.md
+
+# Update from stdin
+cat page.md | gotion update <page_id>
+
+# Update content only
+gotion update <page_id> --content-only --file page.md
+
+# Update properties only
+gotion update <page_id> --properties-only --file page.md
+```
+
+### Get → Edit → Update Workflow
+
+```bash
+# Export page as Markdown
+gotion get <page_id> --format markdown > page.md
+
+# Edit in your favorite editor
+vim page.md
+
+# Push changes back
+gotion update <page_id> --file page.md
+```
+
+## Input Formats
+
+`create` and `update` commands accept input via stdin or `--file`. The format is auto-detected:
+
+### Markdown with YAML Frontmatter
+
+```markdown
+---
+title: "Page Title"
+Status: "In Progress"
+---
+
+# Heading
+Body text
+```
+
+### JSON
+
+```json
+{
+  "properties": {"title": "Page Title"},
+  "content": "# Heading\nBody text"
+}
+```
+
+### Plain Markdown
+
+If input has no frontmatter and is not JSON, it is treated as content only (no properties).
+
 ## Output Formats
 
-| Backend | Default | JSON |
-|---------|---------|------|
-| MCP | Markdown | Not supported |
-| API | Markdown | `--format json` |
+The `get` command supports `--format` flag:
 
-Both backends output Markdown by default. The `--format json` option is only available with the API backend.
+| Format | Description |
+|--------|-------------|
+| `json` (default) | Raw JSON response |
+| `markdown` | Markdown with YAML frontmatter (title, url) |
 
 ## Commands
 
@@ -136,6 +222,8 @@ Both backends output Markdown by default. The `--format json` option is only ava
 | `config` | Show current configuration |
 | `list` | Search and list pages |
 | `get` | Get page details |
+| `create` | Create a new page (MCP only) |
+| `update` | Update an existing page (MCP only) |
 | `version` | Show version info |
 
 ## Environment Variables

@@ -314,6 +314,16 @@ func (c *Client) ToSearchOutput(result *types.SearchResult) *gotion.SearchOutput
 	}
 }
 
+// CreatePage is not supported with API backend
+func (c *Client) CreatePage(ctx context.Context, opts *types.CreatePageOptions) (*types.CreatePageResult, error) {
+	return nil, fmt.Errorf("create is not supported with API backend, use MCP backend")
+}
+
+// UpdatePage is not supported with API backend
+func (c *Client) UpdatePage(ctx context.Context, pageID string, opts *types.UpdatePageOptions) (*types.UpdatePageResult, error) {
+	return nil, fmt.Errorf("update is not supported with API backend, use MCP backend")
+}
+
 // FormatPage formats a page result as JSON string
 func (c *Client) FormatPage(result *types.PageResult) (string, error) {
 	return string(result.RawJSON), nil

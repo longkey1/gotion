@@ -16,7 +16,7 @@ var rootCmd = &cobra.Command{
 	Long:  `gotion is a command-line interface for interacting with the Notion API.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip token refresh for auth and config commands
-		if cmd.Name() == "auth" || cmd.Name() == "config" || cmd.Name() == "version" || cmd.Name() == "help" {
+		if cmd.Name() == "auth" || cmd.Name() == "config" || cmd.Name() == "version" || cmd.Name() == "help" || cmd.Name() == "completion" {
 			return nil
 		}
 		return refreshTokenIfNeeded()

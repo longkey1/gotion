@@ -13,6 +13,7 @@ import (
 
 type getOptions struct {
 	filterProperties string
+	format           string
 }
 
 var getOpts = &getOptions{}
@@ -29,6 +30,7 @@ var getCmd = &cobra.Command{
 
 func init() {
 	getCmd.Flags().StringVar(&getOpts.filterProperties, "filter-properties", "", "Filter properties to retrieve (comma-separated)")
+	getCmd.Flags().StringVar(&getOpts.format, "format", "json", "Output format: json, markdown")
 
 	rootCmd.AddCommand(getCmd)
 }
@@ -71,11 +73,23 @@ func runGet(ctx context.Context, pageIDOrURL string, opts *getOptions) error {
 	}
 
 	// Format output
-	output, err := client.FormatPage(result)
-	if err != nil {
-		return err
+	switch opts.format {
+	case "markdown":
+		output := gotion.FormatPage(&gotion.PageOutput{
+			Title:   result.Title,
+			URL:     result.URL,
+			Content: result.Content,
+		})
+		fmt.Print(output)
+	case "json":
+		output, err := client.FormatPage(result)
+		if err != nil {
+			return err
+		}
+		fmt.Print(output)
+	default:
+		return fmt.Errorf("unknown format: %s (supported: json, markdown)", opts.format)
 	}
 
-	fmt.Print(output)
 	return nil
 }

@@ -16,6 +16,11 @@ type SearchOptions = types.SearchOptions
 type PageResult = types.PageResult
 type SearchResult = types.SearchResult
 type PageSummary = types.PageSummary
+type CreatePageOptions = types.CreatePageOptions
+type UpdatePageOptions = types.UpdatePageOptions
+type CreatePageResult = types.CreatePageResult
+type UpdatePageResult = types.UpdatePageResult
+type Parent = types.Parent
 
 // NewClient creates a new Notion client based on the config
 func NewClient(cfg *config.Config) (Client, error) {
