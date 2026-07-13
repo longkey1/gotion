@@ -88,7 +88,7 @@ func runAuth(ctx context.Context, opts *authOptions) error {
 	}
 }
 
-func runMCPAuth(ctx context.Context, opts *authOptions) error {
+func runMCPAuth(ctx context.Context, _ *authOptions) error {
 	port := defaultMCPCallbackPort
 	callbackURL := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
 

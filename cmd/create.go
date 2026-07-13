@@ -78,7 +78,7 @@ func runCreate(ctx context.Context, opts *createOptions) error {
 	// Override title from flag
 	if opts.title != "" {
 		if input.Properties == nil {
-			input.Properties = make(map[string]interface{})
+			input.Properties = make(map[string]any)
 		}
 		input.Properties["title"] = opts.title
 	}

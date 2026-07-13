@@ -41,15 +41,15 @@ const (
 
 // TokenData holds the OAuth token data
 type TokenData struct {
-	Backend       Backend  `json:"backend"`
-	AccessToken   string   `json:"access_token"`
-	TokenType     string   `json:"token_type"`
-	BotID         string   `json:"bot_id,omitempty"`
-	WorkspaceID   string   `json:"workspace_id,omitempty"`
-	WorkspaceName string   `json:"workspace_name,omitempty"`
-	ClientID      string   `json:"client_id,omitempty"`
-	RefreshToken  string   `json:"refresh_token,omitempty"`
-	ExpiresAt     int64    `json:"expires_at,omitempty"`
+	Backend       Backend `json:"backend"`
+	AccessToken   string  `json:"access_token"`
+	TokenType     string  `json:"token_type"`
+	BotID         string  `json:"bot_id,omitempty"`
+	WorkspaceID   string  `json:"workspace_id,omitempty"`
+	WorkspaceName string  `json:"workspace_name,omitempty"`
+	ClientID      string  `json:"client_id,omitempty"`
+	RefreshToken  string  `json:"refresh_token,omitempty"`
+	ExpiresAt     int64   `json:"expires_at,omitempty"`
 }
 
 // Load loads configuration from environment variables and config file

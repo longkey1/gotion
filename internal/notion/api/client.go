@@ -60,7 +60,7 @@ func (c *Client) GetPage(ctx context.Context, pageID string, opts *types.GetPage
 	}
 
 	// Combine page and blocks into a single response
-	combinedResponse := map[string]interface{}{
+	combinedResponse := map[string]any{
 		"page":   json.RawMessage(pageBody),
 		"blocks": blocks,
 	}
@@ -142,7 +142,7 @@ func (c *Client) processBlockWithChildren(ctx context.Context, rawBlock json.Raw
 	}
 
 	// Parse the original block as a map to add children
-	var blockMap map[string]interface{}
+	var blockMap map[string]any
 	if err := json.Unmarshal(rawBlock, &blockMap); err != nil {
 		return rawBlock, nil
 	}

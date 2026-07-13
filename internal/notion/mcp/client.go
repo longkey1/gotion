@@ -44,7 +44,7 @@ func (c *Client) GetPage(ctx context.Context, pageID string, opts *types.GetPage
 		return nil, err
 	}
 
-	result, err := c.callTool(ctx, "notion-fetch", map[string]interface{}{
+	result, err := c.callTool(ctx, "notion-fetch", map[string]any{
 		"id": pageID,
 	})
 	if err != nil {
@@ -69,7 +69,7 @@ func (c *Client) Search(ctx context.Context, query string, opts *types.SearchOpt
 		return nil, err
 	}
 
-	args := map[string]interface{}{
+	args := map[string]any{
 		"query": query,
 	}
 
@@ -94,19 +94,19 @@ func (c *Client) CreatePage(ctx context.Context, opts *types.CreatePageOptions) 
 		return nil, err
 	}
 
-	page := map[string]interface{}{
+	page := map[string]any{
 		"properties": opts.Properties,
 	}
 	if opts.Content != "" {
 		page["content"] = opts.Content
 	}
 
-	args := map[string]interface{}{
-		"pages": []interface{}{page},
+	args := map[string]any{
+		"pages": []any{page},
 	}
 
 	if opts.Parent != nil {
-		parent := map[string]interface{}{
+		parent := map[string]any{
 			"type":           opts.Parent.Type,
 			opts.Parent.Type: opts.Parent.ID,
 		}
@@ -132,8 +132,8 @@ func (c *Client) UpdatePage(ctx context.Context, pageID string, opts *types.Upda
 
 	var lastResult *callToolResult
 
-	if opts.Properties != nil && len(opts.Properties) > 0 {
-		result, err := c.callTool(ctx, "notion-update-page", map[string]interface{}{
+	if len(opts.Properties) > 0 {
+		result, err := c.callTool(ctx, "notion-update-page", map[string]any{
 			"page_id":    pageID,
 			"command":    "update_properties",
 			"properties": opts.Properties,
@@ -145,7 +145,7 @@ func (c *Client) UpdatePage(ctx context.Context, pageID string, opts *types.Upda
 	}
 
 	if opts.Content != nil {
-		result, err := c.callTool(ctx, "notion-update-page", map[string]interface{}{
+		result, err := c.callTool(ctx, "notion-update-page", map[string]any{
 			"page_id": pageID,
 			"command": "replace_content",
 			"new_str": *opts.Content,
@@ -171,10 +171,10 @@ func (c *Client) ensureInitialized(ctx context.Context) error {
 		return nil
 	}
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"protocolVersion": "2025-03-26",
-		"capabilities":    map[string]interface{}{},
-		"clientInfo": map[string]interface{}{
+		"capabilities":    map[string]any{},
+		"clientInfo": map[string]any{
 			"name":    "gotion",
 			"version": "0.1.0",
 		},
@@ -205,8 +205,8 @@ type callToolResult struct {
 	ContentJSON []byte
 }
 
-func (c *Client) callTool(ctx context.Context, name string, args map[string]interface{}) (*callToolResult, error) {
-	params := map[string]interface{}{
+func (c *Client) callTool(ctx context.Context, name string, args map[string]any) (*callToolResult, error) {
+	params := map[string]any{
 		"name":      name,
 		"arguments": args,
 	}
@@ -244,7 +244,7 @@ func (c *Client) callTool(ctx context.Context, name string, args map[string]inte
 	}, nil
 }
 
-func (c *Client) sendRequest(ctx context.Context, method string, params interface{}) (*jsonRPCResponse, error) {
+func (c *Client) sendRequest(ctx context.Context, method string, params any) (*jsonRPCResponse, error) {
 	reqID := c.requestID.Add(1)
 
 	req := jsonRPCRequest{
@@ -334,10 +334,10 @@ func (c *Client) parseSSEResponse(body io.Reader, expectedID int64) (*jsonRPCRes
 // Internal types
 
 type jsonRPCRequest struct {
-	JSONRPC string      `json:"jsonrpc"`
-	Method  string      `json:"method"`
-	Params  interface{} `json:"params,omitempty"`
-	ID      int64       `json:"id"`
+	JSONRPC string `json:"jsonrpc"`
+	Method  string `json:"method"`
+	Params  any    `json:"params,omitempty"`
+	ID      int64  `json:"id"`
 }
 
 type jsonRPCResponse struct {
@@ -386,10 +386,10 @@ type toolContent struct {
 
 // mcpTextResponse represents the JSON structure in the text field
 type mcpTextResponse struct {
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
-	Title    string                 `json:"title,omitempty"`
-	URL      string                 `json:"url,omitempty"`
-	Text     string                 `json:"text,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
+	Title    string         `json:"title,omitempty"`
+	URL      string         `json:"url,omitempty"`
+	Text     string         `json:"text,omitempty"`
 }
 
 // FormatPage formats a page result as JSON string

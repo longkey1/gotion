@@ -10,7 +10,7 @@ import (
 
 // ParsedInput represents parsed input from stdin or a file
 type ParsedInput struct {
-	Properties map[string]interface{}
+	Properties map[string]any
 	Content    string
 }
 
@@ -46,8 +46,8 @@ func ParseInput(r io.Reader) (*ParsedInput, error) {
 
 func parseJSONInput(text string) (*ParsedInput, error) {
 	var raw struct {
-		Properties map[string]interface{} `json:"properties"`
-		Content    string                 `json:"content"`
+		Properties map[string]any `json:"properties"`
+		Content    string         `json:"content"`
 	}
 	if err := json.Unmarshal([]byte(text), &raw); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON input: %w", err)
@@ -86,7 +86,7 @@ func parseFrontmatterInput(text string) (*ParsedInput, error) {
 
 	// Extract title from frontmatter into properties
 	result := &ParsedInput{
-		Properties: make(map[string]interface{}),
+		Properties: make(map[string]any),
 		Content:    content,
 	}
 

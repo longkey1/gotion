@@ -72,13 +72,13 @@ type Parent struct {
 // CreatePageOptions contains options for CreatePage
 type CreatePageOptions struct {
 	Parent     *Parent
-	Properties map[string]interface{}
+	Properties map[string]any
 	Content    string
 }
 
 // UpdatePageOptions contains options for UpdatePage
 type UpdatePageOptions struct {
-	Properties map[string]interface{}
+	Properties map[string]any
 	Content    *string
 }
 
