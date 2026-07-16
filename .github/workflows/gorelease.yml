@@ -21,7 +21,6 @@ jobs:
 
   gorelease:
     needs: ci
-    name: Release ${{ github.ref_name }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
