@@ -43,3 +43,43 @@ func TestSkipTokenRefresh(t *testing.T) {
 		})
 	}
 }
+
+func TestIsWriteCommand(t *testing.T) {
+	t.Parallel()
+
+	writeCommands := map[string]bool{"create": true, "update": true}
+
+	tests := []struct {
+		name string
+		path []string // command chain from root to leaf
+		want bool
+	}{
+		{name: "create command", path: []string{"create"}, want: true},
+		{name: "update command", path: []string{"update"}, want: true},
+		{name: "get command", path: []string{"get"}, want: false},
+		{name: "list command", path: []string{"list"}, want: false},
+		{name: "auth command", path: []string{"auth"}, want: false},
+		{name: "root only", path: nil, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			root := &cobra.Command{Use: "gotion"}
+			leaf := root
+			for _, name := range tt.path {
+				child := &cobra.Command{Use: name}
+				if writeCommands[name] {
+					child.Annotations = map[string]string{writeAnnotation: "true"}
+				}
+				leaf.AddCommand(child)
+				leaf = child
+			}
+
+			if got := isWriteCommand(leaf); got != tt.want {
+				t.Errorf("isWriteCommand(%v) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}

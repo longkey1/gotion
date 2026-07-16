@@ -10,11 +10,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// writeAnnotation marks a command as mutating Notion state (see create.go/update.go).
+const writeAnnotation = "write"
+
 var rootCmd = &cobra.Command{
 	Use:   "gotion",
 	Short: "A CLI tool for Notion API",
 	Long:  `gotion is a command-line interface for interacting with the Notion API.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if isWriteCommand(cmd) {
+			if err := checkReadOnly(); err != nil {
+				return err
+			}
+		}
 		// Skip token refresh for non-API commands
 		if skipTokenRefresh(cmd) {
 			return nil
@@ -46,6 +54,28 @@ func skipTokenRefresh(cmd *cobra.Command) bool {
 		}
 	}
 	return false
+}
+
+// isWriteCommand returns true if cmd (or an ancestor) is annotated as a write command.
+func isWriteCommand(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		if c.Annotations[writeAnnotation] == "true" {
+			return true
+		}
+	}
+	return false
+}
+
+// checkReadOnly returns an error if read-only mode is enabled.
+func checkReadOnly() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+	if cfg.ReadOnly {
+		return fmt.Errorf("read-only mode is enabled (read_only/GOTION_READ_ONLY); write commands are disabled")
+	}
+	return nil
 }
 
 // refreshTokenIfNeeded checks and refreshes the token if expired

@@ -31,7 +31,8 @@ Supported input formats:
   - Markdown with YAML frontmatter (properties in frontmatter, content in body)
   - JSON with "properties" and "content" fields
   - Plain Markdown (content only)`,
-	Args: cobra.ExactArgs(1),
+	Args:        cobra.ExactArgs(1),
+	Annotations: map[string]string{writeAnnotation: "true"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runUpdate(cmd.Context(), args[0], updateOpts)
 	},

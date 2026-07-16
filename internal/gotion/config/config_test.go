@@ -21,6 +21,7 @@ func setHome(t *testing.T) string {
 		"GOTION_API_TOKEN",
 		"GOTION_API_CLIENT_ID",
 		"GOTION_API_CLIENT_SECRET",
+		"GOTION_READ_ONLY",
 		"NOTION_TOKEN",
 	} {
 		t.Setenv(key, "")
@@ -115,6 +116,19 @@ api_token = "file-token"
 			name:    "broken config file",
 			config:  "backend = [unclosed\n",
 			wantErr: true,
+		},
+		{
+			name:   "read_only from config file",
+			config: "read_only = true\n",
+			want:   Config{ReadOnly: true},
+		},
+		{
+			name:   "GOTION_READ_ONLY overrides config file",
+			config: "read_only = true\n",
+			env: map[string]string{
+				"GOTION_READ_ONLY": "false",
+			},
+			want: Config{ReadOnly: false},
 		},
 	}
 

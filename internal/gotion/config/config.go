@@ -29,6 +29,7 @@ type Config struct {
 	ClientID     string  `mapstructure:"api_client_id"`
 	ClientSecret string  `mapstructure:"api_client_secret"`
 	Backend      Backend `mapstructure:"backend"`
+	ReadOnly     bool    `mapstructure:"read_only"`
 }
 
 // Backend represents which Notion API backend to use
@@ -66,6 +67,7 @@ func Load() (*Config, error) {
 	_ = v.BindEnv("api_client_id", "GOTION_API_CLIENT_ID")
 	_ = v.BindEnv("api_client_secret", "GOTION_API_CLIENT_SECRET")
 	_ = v.BindEnv("api_token", "GOTION_API_TOKEN")
+	_ = v.BindEnv("read_only", "GOTION_READ_ONLY")
 
 	// Load config file
 	configDir, err := GetConfigDir()

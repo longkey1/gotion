@@ -43,6 +43,9 @@ func runConfig() error {
 	}
 	fmt.Printf("Backend:       %s\n", backend)
 
+	// Read Only
+	fmt.Printf("Read Only:     %t\n", cfg.ReadOnly)
+
 	// Token (masked)
 	if cfg.Token != "" {
 		masked := maskToken(cfg.Token)
@@ -73,6 +76,9 @@ func runConfig() error {
 	// Check environment variables
 	if os.Getenv("GOTION_BACKEND") != "" {
 		fmt.Println("GOTION_BACKEND:           set")
+	}
+	if os.Getenv("GOTION_READ_ONLY") != "" {
+		fmt.Println("GOTION_READ_ONLY:         set")
 	}
 	if os.Getenv("GOTION_API_TOKEN") != "" {
 		fmt.Println("GOTION_API_TOKEN:         set")

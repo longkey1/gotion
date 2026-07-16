@@ -32,6 +32,7 @@ Supported input formats:
   - Markdown with YAML frontmatter (title and properties in frontmatter)
   - JSON with "properties" and "content" fields
   - Plain Markdown (content only, use --title for the page title)`,
+	Annotations: map[string]string{writeAnnotation: "true"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runCreate(cmd.Context(), createOpts)
 	},
