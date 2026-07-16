@@ -66,7 +66,7 @@ func runAuth(ctx context.Context, opts *authOptions) error {
 		fmt.Printf("Token file already exists: %s\n", tokenPath)
 		fmt.Print("Do you want to re-authenticate? [y/N]: ")
 		var response string
-		fmt.Scanln(&response)
+		_, _ = fmt.Scanln(&response)
 		if response != "y" && response != "Y" {
 			fmt.Println("Cancelled.")
 			return nil
@@ -120,7 +120,7 @@ func runMCPAuth(ctx context.Context, _ *authOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to start callback server: %w", err)
 	}
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 
 	// Generate state for CSRF protection
 	state, err := generateState()
@@ -196,7 +196,7 @@ func runTraditionalAuth(ctx context.Context, opts *authOptions, cfg *config.Conf
 	if err != nil {
 		return fmt.Errorf("failed to start callback server: %w", err)
 	}
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 
 	redirectURI := fmt.Sprintf("http://localhost:%d/callback", server.Port())
 

@@ -30,8 +30,8 @@ func FormatPage(output *PageOutput) string {
 	var sb strings.Builder
 
 	sb.WriteString("---\n")
-	sb.WriteString(fmt.Sprintf("title: %q\n", output.Title))
-	sb.WriteString(fmt.Sprintf("url: %s\n", output.URL))
+	fmt.Fprintf(&sb, "title: %q\n", output.Title)
+	fmt.Fprintf(&sb, "url: %s\n", output.URL)
 	sb.WriteString("---\n\n")
 
 	if output.Content != "" {
@@ -46,11 +46,11 @@ func FormatSearch(output *SearchOutput) string {
 	var sb strings.Builder
 
 	for _, page := range output.Pages {
-		sb.WriteString(fmt.Sprintf("- [%s](%s)\n", page.Title, page.URL))
+		fmt.Fprintf(&sb, "- [%s](%s)\n", page.Title, page.URL)
 	}
 
 	if output.HasMore && output.NextCursor != "" {
-		sb.WriteString(fmt.Sprintf("\n_More results available (cursor: %s)_\n", output.NextCursor))
+		fmt.Fprintf(&sb, "\n_More results available (cursor: %s)_\n", output.NextCursor)
 	}
 
 	return sb.String()

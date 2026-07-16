@@ -276,7 +276,7 @@ func (c *Client) sendRequest(ctx context.Context, method string, params any) (*j
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Store session ID from response
 	if sessionID := resp.Header.Get("Mcp-Session-Id"); sessionID != "" {

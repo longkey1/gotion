@@ -177,7 +177,7 @@ func (c *Client) doRequest(ctx context.Context, method, url string, reqBody []by
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -238,7 +238,7 @@ func (c *Client) Search(ctx context.Context, query string, opts *types.SearchOpt
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -287,7 +287,7 @@ func (c *Client) ToPageOutput(result *types.PageResult) *gotion.PageOutput {
 		if name == "title" {
 			continue
 		}
-		content.WriteString(fmt.Sprintf("- **%s:** %s\n", name, value))
+		fmt.Fprintf(&content, "- **%s:** %s\n", name, value)
 	}
 
 	return &gotion.PageOutput{

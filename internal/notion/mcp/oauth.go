@@ -116,7 +116,7 @@ func (c *OAuthClient) DiscoverEndpoints(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch protected resource metadata: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -146,7 +146,7 @@ func (c *OAuthClient) DiscoverEndpoints(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch auth server metadata: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -200,7 +200,7 @@ func (c *OAuthClient) RegisterClient(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to register client: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -297,7 +297,7 @@ func (c *OAuthClient) ExchangeCode(ctx context.Context, code string) (*OAuthToke
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange code: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -365,7 +365,7 @@ func RefreshToken(ctx context.Context, clientID, refreshToken string) (*OAuthTok
 	if err != nil {
 		return nil, fmt.Errorf("failed to refresh token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

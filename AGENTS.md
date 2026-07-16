@@ -13,6 +13,7 @@ make build   # Build binary to ./bin/gotion
 make test    # Run tests
 make fmt     # Format code
 make vet     # Vet code
+make lint    # go tool golangci-lint run (version managed by go.mod tool directive)
 make tidy    # Tidy dependencies
 make clean   # Remove build artifacts
 ```

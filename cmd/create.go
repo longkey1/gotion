@@ -63,7 +63,7 @@ func runCreate(ctx context.Context, opts *createOptions) error {
 		if err != nil {
 			return fmt.Errorf("failed to open file: %w", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		input, err = gotion.ParseInput(f)
 		if err != nil {
 			return fmt.Errorf("failed to parse input: %w", err)

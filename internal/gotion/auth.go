@@ -51,7 +51,7 @@ func (s *CallbackServer) Start(ctx context.Context, expectedState string) error 
 			if errCode := query.Get("error"); errCode != "" {
 				s.err = fmt.Errorf("OAuth error: %s", errCode)
 				w.Header().Set("Content-Type", "text/html")
-				fmt.Fprintf(w, `<html><body><h1>Authentication Failed</h1><p>%s</p><p>You can close this window.</p></body></html>`, errCode)
+				_, _ = fmt.Fprintf(w, `<html><body><h1>Authentication Failed</h1><p>%s</p><p>You can close this window.</p></body></html>`, errCode)
 				close(s.done)
 				return
 			}
@@ -61,7 +61,7 @@ func (s *CallbackServer) Start(ctx context.Context, expectedState string) error 
 			if expectedState != "" && state != expectedState {
 				s.err = fmt.Errorf("state mismatch")
 				w.Header().Set("Content-Type", "text/html")
-				fmt.Fprint(w, `<html><body><h1>Authentication Failed</h1><p>State mismatch</p><p>You can close this window.</p></body></html>`)
+				_, _ = fmt.Fprint(w, `<html><body><h1>Authentication Failed</h1><p>State mismatch</p><p>You can close this window.</p></body></html>`)
 				close(s.done)
 				return
 			}
@@ -71,7 +71,7 @@ func (s *CallbackServer) Start(ctx context.Context, expectedState string) error 
 			if code == "" {
 				s.err = fmt.Errorf("no authorization code received")
 				w.Header().Set("Content-Type", "text/html")
-				fmt.Fprint(w, `<html><body><h1>Authentication Failed</h1><p>No authorization code received</p><p>You can close this window.</p></body></html>`)
+				_, _ = fmt.Fprint(w, `<html><body><h1>Authentication Failed</h1><p>No authorization code received</p><p>You can close this window.</p></body></html>`)
 				close(s.done)
 				return
 			}
@@ -79,7 +79,7 @@ func (s *CallbackServer) Start(ctx context.Context, expectedState string) error 
 			s.code = code
 			s.state = state
 			w.Header().Set("Content-Type", "text/html")
-			fmt.Fprint(w, `<html><body><h1>Authentication Successful!</h1><p>You can close this window and return to the terminal.</p></body></html>`)
+			_, _ = fmt.Fprint(w, `<html><body><h1>Authentication Successful!</h1><p>You can close this window and return to the terminal.</p></body></html>`)
 			close(s.done)
 		}),
 	}
