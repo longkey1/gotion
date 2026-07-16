@@ -14,6 +14,7 @@ Or clone and build:
 git clone https://github.com/longkey1/gotion.git
 cd gotion
 go build -o gotion .
+# or: make build (outputs to ./bin/)
 ```
 
 ## Configuration
@@ -36,6 +37,18 @@ backend = "mcp"
 |---------|-------------|
 | `mcp` | MCP API with Dynamic Client Registration (no setup required) |
 | `api` | Traditional REST API (requires client_id and client_secret) |
+
+### Read-only Mode
+
+Block write commands (`create`/`update`) from running, before any Notion API call is made. Useful when exposing the CLI to an LLM or other automation that should never write:
+
+```bash
+# Environment variable
+export GOTION_READ_ONLY="true"
+
+# Or config file (~/.config/gotion/config.toml)
+read_only = true
+```
 
 ## Authentication
 
@@ -101,6 +114,12 @@ gotion list -q "search keyword"
 
 # Limit results
 gotion list -q "search keyword" -n 20
+
+# Sort order (ascending or descending, default: descending)
+gotion list -q "search keyword" --sort ascending
+
+# Paginate with cursor (from previous response)
+gotion list -q "search keyword" --cursor <cursor>
 ```
 
 ### Get Page
@@ -237,6 +256,7 @@ All config file settings can be overridden with environment variables:
 | `GOTION_API_CLIENT_SECRET` | `api_client_secret` | OAuth client secret |
 | `GOTION_API_TOKEN` | `api_token` | Direct API token |
 | `NOTION_TOKEN` | - | Direct API token (fallback) |
+| `GOTION_READ_ONLY` | `read_only` | Block write commands (`create`/`update`) |
 
 Priority: Environment variables > Config file > Token file
 
