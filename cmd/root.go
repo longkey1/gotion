@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -104,17 +105,30 @@ func refreshTokenIfNeeded() error {
 		return nil
 	}
 
-	// Refresh MCP token
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	// Serialize refresh across processes so the same refresh token is never used twice
+	unlock, err := config.LockToken(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to acquire token lock: %w", err)
+	}
+	defer unlock()
+
+	// Re-read under the lock: another process may have refreshed while we waited
+	tokenData, err = config.LoadToken()
+	if err != nil {
+		return nil
+	}
+	if !tokenData.NeedsRefresh() {
+		return nil
+	}
+
+	// Refresh MCP token
 	newToken, err := mcp.RefreshToken(ctx, tokenData.ClientID, tokenData.RefreshToken)
 	if err != nil {
-		// Re-read token file: another process may have already refreshed it
-		reloaded, reloadErr := config.LoadToken()
-		if reloadErr == nil && reloaded.AccessToken != tokenData.AccessToken {
-			// Token was refreshed by another process, use it
-			return nil
+		if oauthErr, ok := errors.AsType[*mcp.OAuthError](err); ok && oauthErr.IsInvalidGrant() {
+			return fmt.Errorf("token refresh failed: the refresh token has expired or been revoked — Notion refresh tokens expire 180 days after the initial authorization (even with regular use) or after 30 days without use; re-authenticate with 'gotion auth': %w", err)
 		}
 		return fmt.Errorf("token refresh failed (re-authenticate with 'gotion auth'): %w", err)
 	}

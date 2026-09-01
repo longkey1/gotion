@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -389,4 +390,55 @@ func TestExchangeCodeErrors(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseTokenEndpointError(t *testing.T) {
+	t.Parallel()
+
+	t.Run("RFC 6749 error object", func(t *testing.T) {
+		t.Parallel()
+
+		err := parseTokenEndpointError(400, []byte(`{"error":"invalid_grant","error_description":"refresh token expired"}`))
+
+		oauthErr, ok := errors.AsType[*OAuthError](err)
+		if !ok {
+			t.Fatalf("parseTokenEndpointError() = %v, want *OAuthError", err)
+		}
+		if oauthErr.StatusCode != 400 {
+			t.Errorf("StatusCode = %d, want 400", oauthErr.StatusCode)
+		}
+		if !oauthErr.IsInvalidGrant() {
+			t.Errorf("IsInvalidGrant() = false, want true (code = %q)", oauthErr.Code)
+		}
+		if !strings.Contains(oauthErr.Error(), "refresh token expired") {
+			t.Errorf("Error() = %q, want it to contain the description", oauthErr.Error())
+		}
+	})
+
+	t.Run("other error code is not invalid_grant", func(t *testing.T) {
+		t.Parallel()
+
+		err := parseTokenEndpointError(400, []byte(`{"error":"invalid_client"}`))
+
+		oauthErr, ok := errors.AsType[*OAuthError](err)
+		if !ok {
+			t.Fatalf("parseTokenEndpointError() = %v, want *OAuthError", err)
+		}
+		if oauthErr.IsInvalidGrant() {
+			t.Error("IsInvalidGrant() = true, want false")
+		}
+	})
+
+	t.Run("non-JSON body falls back to generic error", func(t *testing.T) {
+		t.Parallel()
+
+		err := parseTokenEndpointError(502, []byte("Bad Gateway"))
+
+		if _, ok := errors.AsType[*OAuthError](err); ok {
+			t.Fatalf("parseTokenEndpointError() = *OAuthError, want generic error")
+		}
+		if !strings.Contains(err.Error(), "HTTP 502") || !strings.Contains(err.Error(), "Bad Gateway") {
+			t.Errorf("Error() = %q, want status and body included", err.Error())
+		}
+	})
 }
