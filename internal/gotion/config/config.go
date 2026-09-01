@@ -201,8 +201,29 @@ func SaveToken(token *TokenData) error {
 		return fmt.Errorf("failed to marshal token: %w", err)
 	}
 
-	if err := os.WriteFile(tokenPath, data, 0600); err != nil {
+	// Write to a temp file and rename so readers never observe a partial write
+	tmp, err := os.CreateTemp(configDir, TokenFileName+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp token file: %w", err)
+	}
+	defer func() {
+		_ = os.Remove(tmp.Name())
+	}()
+
+	if err := tmp.Chmod(0600); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("failed to set token file permissions: %w", err)
+	}
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
 		return fmt.Errorf("failed to write token file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("failed to close token file: %w", err)
+	}
+
+	if err := os.Rename(tmp.Name(), tokenPath); err != nil {
+		return fmt.Errorf("failed to replace token file: %w", err)
 	}
 
 	return nil

@@ -338,6 +338,40 @@ func (c *OAuthClient) GetCallbackURL() string {
 	return c.callbackURL
 }
 
+// OAuthError is an OAuth 2.0 error response from the token endpoint (RFC 6749 section 5.2)
+type OAuthError struct {
+	StatusCode  int
+	Code        string
+	Description string
+}
+
+func (e *OAuthError) Error() string {
+	msg := fmt.Sprintf("token endpoint returned HTTP %d: %s", e.StatusCode, e.Code)
+	if e.Description != "" {
+		msg += " (" + e.Description + ")"
+	}
+	return msg
+}
+
+// IsInvalidGrant reports whether the token endpoint rejected the grant itself,
+// i.e. the refresh token is expired or revoked
+func (e *OAuthError) IsInvalidGrant() bool {
+	return e.Code == "invalid_grant"
+}
+
+// parseTokenEndpointError converts a non-200 token endpoint response into an
+// *OAuthError when the body is an RFC 6749 error object, or a generic error otherwise
+func parseTokenEndpointError(statusCode int, body []byte) error {
+	var oe struct {
+		Code        string `json:"error"`
+		Description string `json:"error_description"`
+	}
+	if err := json.Unmarshal(body, &oe); err == nil && oe.Code != "" {
+		return &OAuthError{StatusCode: statusCode, Code: oe.Code, Description: oe.Description}
+	}
+	return fmt.Errorf("HTTP %d: %s", statusCode, string(body))
+}
+
 // RefreshToken refreshes an access token using a refresh token
 func RefreshToken(ctx context.Context, clientID, refreshToken string) (*OAuthToken, error) {
 	client := &OAuthClient{
@@ -373,7 +407,7 @@ func RefreshToken(ctx context.Context, clientID, refreshToken string) (*OAuthTok
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to refresh token: HTTP %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("failed to refresh token: %w", parseTokenEndpointError(resp.StatusCode, body))
 	}
 
 	var token OAuthToken
