@@ -51,15 +51,16 @@ func (c *Client) GetPage(ctx context.Context, pageID string, opts *types.GetPage
 		return nil, err
 	}
 
-	title, url, content := extractPageMetadata(result.Result)
+	title, url, content, properties := extractPageMetadata(result.Result)
 
 	return &types.PageResult{
-		ID:      pageID,
-		Title:   title,
-		URL:     url,
-		Content: content,
-		RawJSON: result.ContentJSON,
-		Source:  "mcp",
+		ID:         pageID,
+		Title:      title,
+		URL:        url,
+		Content:    content,
+		Properties: properties,
+		RawJSON:    result.ContentJSON,
+		Source:     "mcp",
 	}, nil
 }
 
@@ -402,17 +403,18 @@ func (c *Client) FormatSearch(result *types.SearchResult) (string, error) {
 	return string(result.RawJSON), nil
 }
 
-// extractPageMetadata extracts title, url, and markdown content from MCP tool result content
-func extractPageMetadata(result *toolResult) (title, url, content string) {
+// extractPageMetadata extracts title, url, markdown content, and writable
+// properties from MCP tool result content
+func extractPageMetadata(result *toolResult) (title, url, content string, properties map[string]any) {
 	if result == nil || len(result.Content) == 0 {
-		return "", "", ""
+		return "", "", "", nil
 	}
 
 	for _, c := range result.Content {
 		if c.Type == "text" {
 			var resp mcpTextResponse
 			if err := json.Unmarshal([]byte(c.Text), &resp); err == nil {
-				return resp.Title, resp.URL, extractPageContent(resp.Text)
+				return resp.Title, resp.URL, extractPageContent(resp.Text), extractWritableProperties(resp.Text, resp.Title)
 			}
 			// If not JSON, treat as plain markdown content
 			if content == "" {
@@ -421,7 +423,138 @@ func extractPageMetadata(result *toolResult) (title, url, content string) {
 		}
 	}
 
-	return title, url, content
+	return title, url, content, nil
+}
+
+// extractWritableProperties returns the properties of a notion-fetch result
+// that update_properties accepts back unchanged. Sending a read-only property
+// (formula, created_time, unique_id, ...) makes Notion reject the whole update,
+// so only keys that are columns of the parent data source schema and not
+// listed as read-only are kept. The title column is dropped because the page
+// title is carried separately. Pages without a data source schema yield nil.
+func extractWritableProperties(text, title string) map[string]any {
+	props := extractBlock(text, "properties")
+	schema := extractBlock(text, "parent-data-source-schema")
+	if props == "" || schema == "" {
+		return nil
+	}
+
+	var all map[string]any
+	if err := json.Unmarshal([]byte(props), &all); err != nil {
+		return nil
+	}
+
+	columns := parseSchemaColumns(extractBlock(schema, "sqlite-table"))
+	readOnly := parseReadOnlyColumns(schema)
+
+	titleKey := ""
+	for _, col := range columns {
+		if v, ok := all[col].(string); ok && v == title {
+			titleKey = col
+			break
+		}
+	}
+
+	writable := make(map[string]any)
+	for _, col := range columns {
+		v, ok := all[col]
+		if !ok || col == "url" || col == titleKey || readOnly[col] {
+			continue
+		}
+		writable[col] = v
+	}
+
+	if len(writable) == 0 {
+		return nil
+	}
+	return writable
+}
+
+// extractBlock returns the text between a line-start "<tag ...>" line and
+// its closing "</tag>" line, or "" when the block is absent.
+func extractBlock(text, tag string) string {
+	_, rest, found := strings.Cut(text, "\n<"+tag)
+	if !found {
+		return ""
+	}
+	// Skip attributes on the opening tag line
+	_, rest, found = strings.Cut(rest, ">\n")
+	if !found {
+		return ""
+	}
+	body, _, found := strings.Cut(rest, "\n</"+tag+">")
+	if !found {
+		return ""
+	}
+	return body
+}
+
+// parseSchemaColumns returns column names, in order, from a CREATE TABLE
+// statement where each column is on its own tab-indented line.
+func parseSchemaColumns(table string) []string {
+	var columns []string
+	for line := range strings.Lines(table) {
+		line, ok := strings.CutPrefix(line, "\t")
+		if !ok {
+			continue
+		}
+		if quoted, ok := strings.CutPrefix(line, `"`); ok {
+			if name, ok := cutQuotedIdentifier(quoted); ok {
+				columns = append(columns, name)
+			}
+			continue
+		}
+		if name, _, ok := strings.Cut(line, " "); ok {
+			columns = append(columns, name)
+		}
+	}
+	return columns
+}
+
+// cutQuotedIdentifier reads an SQL identifier after its opening quote,
+// where a doubled quote stands for a literal one.
+func cutQuotedIdentifier(s string) (string, bool) {
+	var sb strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] != '"' {
+			sb.WriteByte(s[i])
+			continue
+		}
+		if i+1 < len(s) && s[i+1] == '"' {
+			sb.WriteByte('"')
+			i++
+			continue
+		}
+		return sb.String(), true
+	}
+	return "", false
+}
+
+// parseReadOnlyColumns collects the quoted column names from the schema's
+// read-only notice line, e.g.:
+// These columns are read-only, so don't set them: "Created", "Seq".
+func parseReadOnlyColumns(schema string) map[string]bool {
+	readOnly := make(map[string]bool)
+	before, _, _ := strings.Cut(schema, "<sqlite-table>")
+	for line := range strings.Lines(before) {
+		_, names, found := strings.Cut(line, "read-only")
+		if !found {
+			continue
+		}
+		for {
+			_, rest, found := strings.Cut(names, `"`)
+			if !found {
+				break
+			}
+			name, rest, found := strings.Cut(rest, `"`)
+			if !found {
+				break
+			}
+			readOnly[name] = true
+			names = rest
+		}
+	}
+	return readOnly
 }
 
 // extractPageContent returns the page body inside the <content> block of a

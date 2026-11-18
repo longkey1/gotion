@@ -44,6 +44,9 @@ type PageResult struct {
 	RawJSON []byte            // Raw JSON (API only)
 	Props   map[string]string // Properties
 	Source  string            // "api" or "mcp"
+
+	// Properties that can be passed back to UpdatePage unchanged (MCP only)
+	Properties map[string]any
 }
 
 // SearchResult represents the result of Search
