@@ -134,37 +134,63 @@ func TestParseFrontmatterProperties(t *testing.T) {
 	tests := []struct {
 		name        string
 		frontmatter string
-		want        map[string]string
+		want        map[string]any
+		wantErr     bool
 	}{
 		{
 			name:        "simple key values",
 			frontmatter: "title: Hello\nstatus: done",
-			want:        map[string]string{"title": "Hello", "status": "done"},
-		},
-		{
-			name:        "blank lines and lines without colon are skipped",
-			frontmatter: "title: Hello\n\nnot-a-pair\nstatus: done",
-			want:        map[string]string{"title": "Hello", "status": "done"},
-		},
-		{
-			name:        "surrounding whitespace is trimmed",
-			frontmatter: "  title  :   spaced out  ",
-			want:        map[string]string{"title": "spaced out"},
+			want:        map[string]any{"title": "Hello", "status": "done"},
 		},
 		{
 			name:        "quotes are stripped",
 			frontmatter: "a: \"double\"\nb: 'single'",
-			want:        map[string]string{"a": "double", "b": "single"},
+			want:        map[string]any{"a": "double", "b": "single"},
 		},
 		{
-			name:        "single character value keeps quote-like char",
-			frontmatter: "a: \"",
-			want:        map[string]string{"a": "\""},
+			name:        "escaped quotes are unescaped",
+			frontmatter: `title: "He said \"hi\""`,
+			want:        map[string]any{"title": `He said "hi"`},
+		},
+		{
+			name:        "value containing colon",
+			frontmatter: "link: https://example.com/a:b",
+			want:        map[string]any{"link": "https://example.com/a:b"},
+		},
+		{
+			name:        "flow sequence becomes list",
+			frontmatter: "tags: [a, b]",
+			want:        map[string]any{"tags": []any{"a", "b"}},
+		},
+		{
+			name:        "block sequence becomes list",
+			frontmatter: "tags:\n  - a\n  - b",
+			want:        map[string]any{"tags": []any{"a", "b"}},
+		},
+		{
+			name:        "numbers and booleans keep their types",
+			frontmatter: "count: 3\nratio: 0.5\ndone: true",
+			want:        map[string]any{"count": 3, "ratio": 0.5, "done": true},
+		},
+		{
+			name:        "dates keep their original text",
+			frontmatter: "due: 2024-01-02\nat: 2024-01-02T10:00:00Z",
+			want:        map[string]any{"due": "2024-01-02", "at": "2024-01-02T10:00:00Z"},
 		},
 		{
 			name:        "empty frontmatter",
 			frontmatter: "",
-			want:        map[string]string{},
+			want:        map[string]any{},
+		},
+		{
+			name:        "invalid yaml",
+			frontmatter: "title: [unclosed",
+			wantErr:     true,
+		},
+		{
+			name:        "non-mapping frontmatter",
+			frontmatter: "- a\n- b",
+			wantErr:     true,
 		},
 	}
 
@@ -172,7 +198,13 @@ func TestParseFrontmatterProperties(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := parseFrontmatterProperties(tt.frontmatter)
+			got, err := parseFrontmatterProperties(tt.frontmatter)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("parseFrontmatterProperties() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				return
+			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseFrontmatterProperties() = %+v, want %+v", got, tt.want)
 			}

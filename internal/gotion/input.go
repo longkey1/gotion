@@ -1,11 +1,12 @@
 package gotion
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
+
+	yaml "go.yaml.in/yaml/v3"
 )
 
 // ParsedInput represents parsed input from stdin or a file
@@ -82,21 +83,17 @@ func parseFrontmatterInput(text string) (*ParsedInput, error) {
 	frontmatter := rest[:closingIdx]
 	content := strings.TrimSpace(rest[closingIdx+4:]) // skip "\n---"
 
-	props := parseFrontmatterProperties(frontmatter)
-
-	// Extract title from frontmatter into properties
-	result := &ParsedInput{
-		Properties: make(map[string]any),
-		Content:    content,
+	props, err := parseFrontmatterProperties(frontmatter)
+	if err != nil {
+		return nil, err
 	}
 
-	for k, v := range props {
-		if k == "title" {
-			result.Properties["title"] = v
-		} else if k != "url" {
-			// Skip url (it's metadata, not a property to set)
-			result.Properties[k] = v
-		}
+	// url is page metadata emitted by "get --format markdown", not a settable property
+	delete(props, "url")
+
+	result := &ParsedInput{
+		Properties: props,
+		Content:    content,
 	}
 
 	if len(result.Properties) == 0 {
@@ -106,32 +103,76 @@ func parseFrontmatterInput(text string) (*ParsedInput, error) {
 	return result, nil
 }
 
-// parseFrontmatterProperties parses simple "key: value" lines from frontmatter
-func parseFrontmatterProperties(frontmatter string) map[string]string {
-	props := make(map[string]string)
-	scanner := bufio.NewScanner(strings.NewReader(frontmatter))
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-
-		idx := strings.Index(line, ":")
-		if idx == -1 {
-			continue
-		}
-
-		key := strings.TrimSpace(line[:idx])
-		value := strings.TrimSpace(line[idx+1:])
-
-		// Remove surrounding quotes
-		if len(value) >= 2 && ((value[0] == '"' && value[len(value)-1] == '"') || (value[0] == '\'' && value[len(value)-1] == '\'')) {
-			value = value[1 : len(value)-1]
-		}
-
-		props[key] = value
+// parseFrontmatterProperties parses the frontmatter block as a YAML mapping
+func parseFrontmatterProperties(frontmatter string) (map[string]any, error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(frontmatter), &doc); err != nil {
+		return nil, fmt.Errorf("failed to parse frontmatter: %w", err)
 	}
 
-	return props
+	// Empty frontmatter yields a zero node
+	if len(doc.Content) == 0 {
+		return map[string]any{}, nil
+	}
+
+	root := doc.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("failed to parse frontmatter: expected key-value mapping")
+	}
+
+	value, err := yamlNodeValue(root)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse frontmatter: %w", err)
+	}
+
+	props, ok := value.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse frontmatter: expected key-value mapping")
+	}
+
+	return props, nil
+}
+
+// yamlNodeValue converts a YAML node to a Go value, keeping timestamps as
+// their original text: decoding them to time.Time would re-serialize dates
+// like 2024-01-02 as RFC 3339 datetimes when sent to Notion.
+func yamlNodeValue(node *yaml.Node) (any, error) {
+	switch node.Kind {
+	case yaml.AliasNode:
+		return yamlNodeValue(node.Alias)
+	case yaml.MappingNode:
+		m := make(map[string]any, len(node.Content)/2)
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			var key string
+			if err := node.Content[i].Decode(&key); err != nil {
+				return nil, err
+			}
+			v, err := yamlNodeValue(node.Content[i+1])
+			if err != nil {
+				return nil, err
+			}
+			m[key] = v
+		}
+		return m, nil
+	case yaml.SequenceNode:
+		s := make([]any, 0, len(node.Content))
+		for _, child := range node.Content {
+			v, err := yamlNodeValue(child)
+			if err != nil {
+				return nil, err
+			}
+			s = append(s, v)
+		}
+		return s, nil
+	case yaml.ScalarNode:
+		if node.ShortTag() == "!!timestamp" {
+			return node.Value, nil
+		}
+	}
+
+	var v any
+	if err := node.Decode(&v); err != nil {
+		return nil, err
+	}
+	return v, nil
 }

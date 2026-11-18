@@ -3,6 +3,8 @@ package gotion
 import (
 	"fmt"
 	"strings"
+
+	yaml "go.yaml.in/yaml/v3"
 )
 
 // PageOutput is the intermediate structure for page formatting
@@ -25,20 +27,32 @@ type SearchOutput struct {
 	NextCursor string
 }
 
+type pageFrontmatter struct {
+	Title string `yaml:"title"`
+	URL   string `yaml:"url"`
+}
+
 // FormatPage formats a PageOutput as Markdown with YAML frontmatter
-func FormatPage(output *PageOutput) string {
+func FormatPage(output *PageOutput) (string, error) {
+	frontmatter, err := yaml.Marshal(pageFrontmatter{
+		Title: output.Title,
+		URL:   output.URL,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal frontmatter: %w", err)
+	}
+
 	var sb strings.Builder
 
 	sb.WriteString("---\n")
-	fmt.Fprintf(&sb, "title: %q\n", output.Title)
-	fmt.Fprintf(&sb, "url: %s\n", output.URL)
+	sb.Write(frontmatter)
 	sb.WriteString("---\n\n")
 
 	if output.Content != "" {
 		sb.WriteString(output.Content)
 	}
 
-	return sb.String()
+	return sb.String(), nil
 }
 
 // FormatSearch formats a SearchOutput as Markdown
