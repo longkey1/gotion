@@ -76,9 +76,10 @@ func runGet(ctx context.Context, pageIDOrURL string, opts *getOptions) error {
 	switch opts.format {
 	case "markdown":
 		output, err := gotion.FormatPage(&gotion.PageOutput{
-			Title:   result.Title,
-			URL:     result.URL,
-			Content: result.Content,
+			Title:      result.Title,
+			URL:        result.URL,
+			Properties: result.Properties,
+			Content:    result.Content,
 		})
 		if err != nil {
 			return err

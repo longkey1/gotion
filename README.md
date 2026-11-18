@@ -231,7 +231,9 @@ The `get` command supports `--format` flag:
 | Format | Description |
 |--------|-------------|
 | `json` (default) | Raw JSON response |
-| `markdown` | Markdown with YAML frontmatter (title, url) |
+| `markdown` | Markdown with YAML frontmatter (title, url, and on the MCP backend the page's writable database properties) |
+
+On the MCP backend, `get --format markdown` output can be edited and passed back to `update` as is. Read-only properties (formula, rollup, created/edited time, unique ID, etc.) are left out of the frontmatter because Notion rejects the whole update if any of them is sent.
 
 ## Commands
 

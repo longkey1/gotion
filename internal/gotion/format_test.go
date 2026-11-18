@@ -32,6 +32,23 @@ func TestFormatPage(t *testing.T) {
 			want: "---\ntitle: Empty\nurl: https://www.notion.so/xyz\n---\n\n",
 		},
 		{
+			name: "properties follow title and url in sorted order",
+			output: &PageOutput{
+				Title: "Task",
+				URL:   "https://www.notion.so/t",
+				Properties: map[string]any{
+					"Status":               "Todo",
+					"Tags":                 []any{"a", "b"},
+					"date:Due:start":       "2026-12-01",
+					"date:Due:is_datetime": float64(0),
+				},
+				Content: "body",
+			},
+			want: "---\ntitle: Task\nurl: https://www.notion.so/t\n" +
+				"Status: Todo\nTags:\n  - a\n  - b\ndate:Due:is_datetime: 0\ndate:Due:start: \"2026-12-01\"\n" +
+				"---\n\nbody",
+		},
+		{
 			name: "title with quotes and colon is quoted",
 			output: &PageOutput{
 				Title: `He said "hi": yes`,

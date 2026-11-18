@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -139,7 +140,7 @@ func TestExtractPageMetadata(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			title, url, content := extractPageMetadata(tt.result)
+			title, url, content, _ := extractPageMetadata(tt.result)
 			if title != tt.wantTitle {
 				t.Errorf("title = %q, want %q", title, tt.wantTitle)
 			}
@@ -294,6 +295,90 @@ func TestExtractPageContent(t *testing.T) {
 
 			if got := extractPageContent(tt.text); got != tt.want {
 				t.Errorf("extractPageContent() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExtractWritableProperties(t *testing.T) {
+	t.Parallel()
+
+	const schema = "\n<parent-data-source-schema url=\"collection://x\">\n" +
+		"The SQLite table definition for this page's parent data source.\n" +
+		"These columns are read-only, so don't set them: \"Created\", \"Seq\".\n" +
+		"<sqlite-table>\n" +
+		"CREATE TABLE IF NOT EXISTS \"collection://x\" (\n" +
+		"\turl TEXT UNIQUE,\n" +
+		"\tcreatedTime TEXT, -- automatically set\n" +
+		"\t\"Created\" TEXT NOT NULL,\n" +
+		"\t\"Seq\" INTEGER,\n" +
+		"\t\"Name\" TEXT,\n" +
+		"\t\"Note\" TEXT,\n" +
+		"\t\"Say \"\"hi\"\"\" TEXT,\n" +
+		"\t\"Tags\" TEXT, -- JSON array\n" +
+		"\t\"date:Due:start\" TEXT,\n" +
+		"\t\"date:Due:is_datetime\" INTEGER\n" +
+		")\n" +
+		"</sqlite-table>\n" +
+		"</parent-data-source-schema>"
+
+	page := func(props string) string {
+		return "Here is the result of \"fetch\":\n<page url=\"u\">\n<properties>\n" + props +
+			"\n</properties>\n<content>\nbody\n</content>\n</page>\n"
+	}
+
+	tests := []struct {
+		name  string
+		text  string
+		title string
+		want  map[string]any
+	}{
+		{
+			name: "read-only, non-column, url and title keys are dropped",
+			text: page(`{"Calc":"formulaResult://x","Created":"2026-01-01T00:00:00Z","Seq":"T-1","Name":"My Page",`+
+				`"Note":"n","Say \"hi\"":"q","Tags":["a","b"],"date:Due:start":"2026-12-01","date:Due:is_datetime":0,"url":"https://x"}`) + schema,
+			title: "My Page",
+			want: map[string]any{
+				"Note":                 "n",
+				`Say "hi"`:             "q",
+				"Tags":                 []any{"a", "b"},
+				"date:Due:start":       "2026-12-01",
+				"date:Due:is_datetime": float64(0),
+			},
+		},
+		{
+			name:  "only the first column matching the title is dropped",
+			text:  page(`{"Name":"Same","Note":"Same"}`) + schema,
+			title: "Same",
+			want:  map[string]any{"Note": "Same"},
+		},
+		{
+			name:  "page without data source schema",
+			text:  page(`{"title":"Plain"}`),
+			title: "Plain",
+			want:  nil,
+		},
+		{
+			name:  "only read-only properties",
+			text:  page(`{"Created":"2026-01-01T00:00:00Z","Name":"T"}`) + schema,
+			title: "T",
+			want:  nil,
+		},
+		{
+			name:  "invalid properties JSON",
+			text:  page(`{not json`) + schema,
+			title: "T",
+			want:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := extractWritableProperties(tt.text, tt.title)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("extractWritableProperties() = %#v, want %#v", got, tt.want)
 			}
 		})
 	}
