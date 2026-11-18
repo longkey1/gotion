@@ -75,11 +75,14 @@ func runGet(ctx context.Context, pageIDOrURL string, opts *getOptions) error {
 	// Format output
 	switch opts.format {
 	case "markdown":
-		output := gotion.FormatPage(&gotion.PageOutput{
+		output, err := gotion.FormatPage(&gotion.PageOutput{
 			Title:   result.Title,
 			URL:     result.URL,
 			Content: result.Content,
 		})
+		if err != nil {
+			return err
+		}
 		fmt.Print(output)
 	case "json":
 		output, err := client.FormatPage(result)

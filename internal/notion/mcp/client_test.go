@@ -94,6 +94,17 @@ func TestExtractPageMetadata(t *testing.T) {
 			wantContent: "# Body",
 		},
 		{
+			name: "JSON text content with fetch wrapper",
+			result: &toolResult{
+				Content: []toolContent{
+					{Type: "text", Text: `{"title": "My Page", "url": "https://www.notion.so/abc", "text": "Here is the result of \"fetch\":\n<page url=\"https://www.notion.so/abc\">\n<properties>\n{\"Name\":\"My Page\"}\n</properties>\n<content>\n# Body\n</content>\n</page>\n\n<parent-data-source-schema>\nschema\n</parent-data-source-schema>"}`},
+				},
+			},
+			wantTitle:   "My Page",
+			wantURL:     "https://www.notion.so/abc",
+			wantContent: "# Body",
+		},
+		{
 			name: "plain markdown text content",
 			result: &toolResult{
 				Content: []toolContent{
@@ -234,5 +245,56 @@ func TestClientFormatPageAndSearch(t *testing.T) {
 	}
 	if search != `[]` {
 		t.Errorf("FormatSearch() = %q, want raw JSON", search)
+	}
+}
+
+func TestExtractPageContent(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		text string
+		want string
+	}{
+		{
+			name: "body inside content block",
+			text: "header\n<properties>\n{}\n</properties>\n<content>\n# Title\n\nBody\n</content>\n</page>\n\n<parent-data-source-schema>\nx\n</parent-data-source-schema>",
+			want: "# Title\n\nBody",
+		},
+		{
+			name: "empty content block",
+			text: "header\n<content>\n</content>\n</page>",
+			want: "",
+		},
+		{
+			name: "content tag inside single-line property JSON is ignored",
+			text: "header\n<properties>\n{\"Goal\":\"<content>x</content>\"}\n</properties>\n<content>\nreal\n</content>\n</page>",
+			want: "real",
+		},
+		{
+			name: "literal closing tag line in body is kept",
+			text: "header\n<content>\nbefore\n</content>\nafter\n</content>\n</page>",
+			want: "before\n</content>\nafter",
+		},
+		{
+			name: "no content block returns text unchanged",
+			text: "# Plain markdown",
+			want: "# Plain markdown",
+		},
+		{
+			name: "unclosed content block returns text unchanged",
+			text: "header\n<content>\nbody",
+			want: "header\n<content>\nbody",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := extractPageContent(tt.text); got != tt.want {
+				t.Errorf("extractPageContent() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

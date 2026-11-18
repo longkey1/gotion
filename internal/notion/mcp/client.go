@@ -412,7 +412,7 @@ func extractPageMetadata(result *toolResult) (title, url, content string) {
 		if c.Type == "text" {
 			var resp mcpTextResponse
 			if err := json.Unmarshal([]byte(c.Text), &resp); err == nil {
-				return resp.Title, resp.URL, resp.Text
+				return resp.Title, resp.URL, extractPageContent(resp.Text)
 			}
 			// If not JSON, treat as plain markdown content
 			if content == "" {
@@ -422,4 +422,29 @@ func extractPageMetadata(result *toolResult) (title, url, content string) {
 	}
 
 	return title, url, content
+}
+
+// extractPageContent returns the page body inside the <content> block of a
+// notion-fetch result. The fetch text also wraps the body with metadata
+// (ancestor path, properties, data source schema); passing that back through
+// replace_content would write it into the page. Text without a <content>
+// block is returned unchanged.
+func extractPageContent(text string) string {
+	const openTag = "\n<content>"
+	const closeTag = "\n</content>"
+
+	// Match the opening tag at a line start: the preceding <properties> block is
+	// single-line JSON, so a "<content>" string inside a property value cannot match.
+	_, body, found := strings.Cut(text, openTag)
+	if !found {
+		return text
+	}
+
+	// The last closing tag ends the block, so a literal "</content>" line in the body is kept.
+	body, _, found = strings.CutLast(body, closeTag)
+	if !found {
+		return text
+	}
+
+	return strings.TrimPrefix(body, "\n")
 }
